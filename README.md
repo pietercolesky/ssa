@@ -1,2 +1,2 @@
 # ssa
-Space Science
+Space Science Assignments
