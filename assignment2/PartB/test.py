@@ -5,6 +5,31 @@ center = [[5,30,0],[0,0,0]]
 betelgeuse = [[5 , 55, 10.3053],[7,24,25.426]]
 rigel = [[5,14,32.272],[-8,12,5.898]]
 
+def plot_antennas_2D(enu_coordinates):
+    E = []
+    N = []
+    
+    for antenna in enu_coordinates:
+        E.append(antenna[0])
+        N.append(antenna[1])
+
+    max_E = max(np.abs(E))
+    max_N = max(np.abs(N))
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.scatter(E,N)
+
+    ax.set_xlabel("W-E (m)")
+    ax.set_ylabel("S-N (m)")
+
+    ax.set_xlim([-max_E - (1/3)*max_E, max_E + (1/3)*max_E])
+    ax.set_ylim([-max_N - (1/3)*max_N, max_N + (1/3)*max_N])
+
+    plt.show()
+    plt.cla()
+    plt.clf()
+
 def ra_to_rad(h, m, s):
     ra_h = h + (m / 60) + (s/3600)
     ra_rad = (ra_h / 24) * 2 * np.pi
@@ -104,6 +129,7 @@ def visibilities(point_sources):
             for point in point_sources:
                 imaginary_visibilities[len(v_range)-v-1,u] += -point[0] * np.sin(2 * np.pi * (point[1] * u_range[u] + point[2] * v_range[v]))
                 real_visibilities[len(v_range)-v-1,u] += point[0] * np.cos(2 * np.pi * (point[1] * u_range[u] + point[2] * v_range[v]))
+
 
     fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,8))
 
@@ -205,13 +231,12 @@ papino_flux = papino_df['flux'][0]
 paperino_flux = paperino_df['flux'][1]
 
 
-point_sources = [[papino_flux, papino_lm[0], papino_lm[1]],[paperino_flux, paperino_lm[0], paperino_lm[1]]]
-# print(point_sources)
+point_sources = [[1, 0, 0],[0.2, 0, 0.01832]]
+
 # sky_model(point_sources)
 
 # visibilities(point_sources)
 
-# print(enu_coords)
 
 #Calculating Baseline length, 
 
@@ -223,21 +248,23 @@ def ENU_to_XYZ(azimith, elevation, distance, latitude):
     return XYZ_coordinate
 
 def XYZ_to_UVW(hour_angle, declination, wavelength, xyz_coordinate):
-    matrix = (1/wavelength)*np.array([[np.sin(hour_angle), np.cos(hour_angle), 0],
+    matrix = np.array([[np.sin(hour_angle), np.cos(hour_angle), 0],
                              [-np.sin(declination)*np.cos(hour_angle), np.sin(declination)*np.sin(hour_angle), np.cos(declination)],
                              [np.cos(declination), -np.cos(declination)*np.sin(hour_angle), np.sin(declination)]])
     
-    uvw_coordinate = matrix.dot(xyz_coordinate)
+    uvw_coordinate = matrix.dot(xyz_coordinate/ wavelength)
 
     return uvw_coordinate
 
 
 
 num_steps = config["num_steps"]
-hour_angle_range = np.linspace(config['hour_angle_range'][0], config['hour_angle_range'][1], num_steps)
+hour_angle_range = np.linspace(config['hour_angle_range'][0], config['hour_angle_range'][1], num_steps) * np.pi/12
 
 speed_of_light = 299792458 
-wavelength = speed_of_light/ (config['obs_freq'] * 1e9)
+wavelength = speed_of_light/ (150*10**6)
+
+plot_antennas_2D(enu_coords)
 
 N = len(enu_coords)
 B = (int)((N**2 - N)/2)
@@ -255,7 +282,7 @@ w_m = np.zeros((N,N,num_steps),dtype=float)
 count = 0
 for i in range(N):
     for j in range(i+1, N):
-        baseline_lengths[count] = np.sum((enu_coords[i] - enu_coords[j])**2)
+        baseline_lengths[count] = np.sqrt(np.sum((enu_coords[i] - enu_coords[j])**2))
         azimiths[count] = np.arctan2(enu_coords[j,0] - enu_coords[i,0], enu_coords[j,1] - enu_coords[i,1])
         elevations[count] = np.arcsin((enu_coords[j,2] - enu_coords[i,2])/baseline_lengths[count]) 
 
@@ -276,7 +303,6 @@ for i in range(N):
 
 u_max = np.max(np.abs(u_m))
 v_max = np.max(np.abs(v_m))
-
 
 for i in range(N):
     for j in range(i+1,N):
