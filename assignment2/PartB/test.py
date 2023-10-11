@@ -304,6 +304,12 @@ for i in range(N):
 u_max = np.max(np.abs(u_m))
 v_max = np.max(np.abs(v_m))
 
+plt.plot(u_m[1,2,:], v_m[1,2,:], "b")
+plt.plot(u_m[2,1,:], v_m[2,1,:], "r")
+plt.show()
+plt.cla()
+plt.clf()
+
 for i in range(N):
     for j in range(i+1,N):
         u = u_m[i,j,:]
