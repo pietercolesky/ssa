@@ -46,10 +46,8 @@ def calculate_xyz(lat, d, a, e):
 
 
 def calculate_uvw(h, dec, xyz, wavelength):
-    return np.array(
-        [
-            [np.sin(h), np.cos(h), 0],
-            [-np.sin(dec) * np.cos(h), np.sin(dec) * np.sin(h), np.cos(dec)],
-            [np.cos(dec), -np.cos(dec) * np.sin(h), np.sin(dec)]
-        ]
-    ).dot(xyz) / wavelength
+    return np.array([
+        [np.sin(h), np.cos(h), 0],
+        [-np.sin(dec) * np.cos(h), np.sin(dec) * np.sin(h), np.cos(dec)],
+        [np.cos(dec), -np.cos(dec) * np.sin(h), np.sin(dec)]
+    ]).dot(xyz) / wavelength
