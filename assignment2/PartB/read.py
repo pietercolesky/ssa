@@ -28,9 +28,9 @@ def read_sky_model_df():
     df = read_csv(input_dir / 'skymodel.csv', usecols=["name", "flux", "ra", "dec"])
     df["ra"] = df["ra"].map(lambda ra: hours_to_rad(*list(map(float, ra.split(',')))))
     df["dec"] = df["dec"].map(lambda dec: deg_to_rad(*list(map(float, dec.split(',')))))
-    field_center = df[df["name"] == "Papino"]
-    ra_0 = field_center["ra"].values[0]
-    dec_0 = field_center["dec"].values[0]
+    field_center = df.iloc[0]
+    ra_0 = field_center["ra"]
+    dec_0 = field_center["dec"]
     df["ra_delta"] = df["ra"] - ra_0
     df["l"] = df[["dec", "ra_delta"]].apply(calculate_l, axis=1)
     df["m"] = df[["dec", "ra_delta"]].apply(lambda src: calculate_m(src, dec_0), axis=1)
