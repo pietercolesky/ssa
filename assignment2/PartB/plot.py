@@ -5,8 +5,8 @@ import numpy as np
 def plot_sky_model(model, plane_size):
     plt.imshow(model, extent=(-plane_size / 2, plane_size / 2, -plane_size / 2, plane_size / 2), cmap='jet')
     plt.colorbar(label='Brightness')
-    plt.xlabel('l (degrees)')
-    plt.ylabel('m (degrees)')
+    plt.xlabel(r'l ($^{\circ}$)')
+    plt.ylabel(r'm ($^{\circ}$)')
     plt.title('Skymodel (in brightness)')
     plt.show()
 
@@ -58,6 +58,10 @@ def plot_uv(values):
     for uvw in values:
         plt.plot(uvw[:, 0], uvw[:, 1], c="b")
         plt.plot(-uvw[:, 0], -uvw[:, 1], c="r")
+
+    plt.xlabel(r"u (rad$^{-1})$")
+    plt.ylabel(r"v (rad$^{-1})$")
+    plt.title('uv-tracks')
 
     plt.show()
     plt.cla()
