@@ -56,7 +56,8 @@ def plot_antennas_2D(enu_coordinates):
 
 def plot_uv(values):
     for uvw in values:
-        plt.plot(uvw[:, 0], uvw[:, 1])
+        plt.plot(uvw[:, 0], uvw[:, 1], c="b")
+        plt.plot(-uvw[:, 0], -uvw[:, 1], c="r")
 
     plt.show()
     plt.cla()
