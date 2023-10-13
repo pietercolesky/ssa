@@ -30,8 +30,8 @@ def get_skymodel(df):
 
 def get_visibilities(df):
     u_range = np.linspace(-4000, 4000, 500)
-    v_range = np.linspace(-3000, 3000, 500)
-    u, v = np.meshgrid(u_range, v_range[::-1])
+    v_range = np.linspace(3000, -3000, 500)
+    u, v = np.meshgrid(u_range, v_range)
 
     vis = calculate_visibilities(
         df['flux'].values[:, np.newaxis, np.newaxis],
