@@ -78,8 +78,7 @@ plot_antennas_2D(enu_coords)
 num_steps = config["num_steps"]
 hour_angle_range = np.linspace(config["hour_angle_range"][0], config["hour_angle_range"][1], num_steps)
 
-speed_of_light = 2.9983 * 10 ** 8
-wavelength = speed_of_light / (config['obs_freq'] * 10 ** 9)
+wavelength = 299792458 / (config['obs_freq'] * 10 ** 9)
 
 baselines = list(combinations(enu_coords, 2))
 baselines_df = pd.DataFrame(baselines, columns=["X1", "X2"])
