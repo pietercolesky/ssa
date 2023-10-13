@@ -38,13 +38,11 @@ def calculate_visibilities(flux, u, l0, v, m0):
 
 
 def calculate_xyz(lat, d, a, e):
-    return d * np.array(
-        [
-            [np.cos(lat) * np.sin(e) - np.sin(lat) * np.cos(e) * np.cos(a)],
-            [np.cos(e) * np.sin(a)],
-            [np.sin(lat) * np.sin(e) + np.cos(lat) * np.cos(e) * np.cos(a)]
-        ]
-    )
+    return d * np.array([
+        np.cos(lat) * np.sin(e) - np.sin(lat) * np.cos(e) * np.cos(a),
+        np.cos(e) * np.sin(a),
+        np.sin(lat) * np.sin(e) + np.cos(lat) * np.cos(e) * np.cos(a)
+    ])
 
 
 def calculate_uvw(h, dec, xyz, wavelength):

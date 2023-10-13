@@ -51,7 +51,7 @@ def get_xyz(baseline, lat):
 
 
 def get_uvw(xyz, h_range, dec, wavelength):
-    return np.array(list(map(lambda h: calculate_uvw(h, dec, xyz, wavelength), h_range)))
+    return list(map(lambda h: calculate_uvw(h, dec, xyz, wavelength), h_range))
 
 
 config = read_config()
@@ -75,4 +75,5 @@ baselines_df["E"] = baselines_df["b"].map(lambda b: np.arctan(b[2] / la.norm(b[:
 baselines_df["XYZ"] = baselines_df[["D", "A", "E"]].apply(lambda baseline: get_xyz(baseline, config["lat"]), axis=1)
 baselines_df["UVW"] = baselines_df["XYZ"].map(lambda xyz: get_uvw(xyz, hour_angle_range, config["dec"], obs_wavelength))
 
-plot_uv(baselines_df["UVW"].values)
+uvw = np.stack(baselines_df["UVW"].values)
+plot_uv(uvw)

@@ -56,14 +56,11 @@ def plot_antennas_2D(enu_coordinates):
 
 def plot_uv(values):
     for uvw in values:
-        plt.plot(uvw[:, 0], uvw[:, 1], c="b")
-        plt.plot(-uvw[:, 0], -uvw[:, 1], c="r")
+        plt.scatter(uvw[:, 0], uvw[:, 1], s=2, c="b", label="Baselines")
+        plt.scatter(-uvw[:, 0], -uvw[:, 1], s=2, c="r", label="Conjugate Baselines")
 
     plt.xlabel(r"u (rad$^{-1})$")
     plt.ylabel(r"v (rad$^{-1})$")
     plt.title('uv-tracks')
-
+    plt.legend(["Baselines", "Conjugate Baselines"])
     plt.show()
-    plt.cla()
-    plt.clf()
-
