@@ -63,10 +63,8 @@ visibilities = get_visibilities(skymodel_df)
 
 plot_antennas_2D(enu_coords)
 
-num_steps = config["num_steps"]
-hour_angle_range = np.linspace(config["hour_angle_range"][0], config["hour_angle_range"][1], num_steps)
-
 obs_wavelength = 299792458 / (config['obs_freq'] * 10 ** 9)
+hour_angle_range = np.linspace(config["hour_angle_range"][0], config["hour_angle_range"][1], config["num_steps"])
 
 baselines = list(combinations(enu_coords, 2))
 baselines_df = pd.DataFrame(baselines, columns=["X1", "X2"])
