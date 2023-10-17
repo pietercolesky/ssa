@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 
 center = [[5,30,0],[0,0,0]]
 betelgeuse = [[5 , 55, 10.3053],[7,24,25.426]]
@@ -16,9 +17,17 @@ def plot_antennas_2D(enu_coordinates):
     max_E = max(np.abs(E))
     max_N = max(np.abs(N))
 
+    marker = plt.imread('telescope.png')
+    marker_size = 10
+    
+
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.scatter(E,N)
+
+    # ax.scatter(E,N, marker="^")
+
+    for i in range(len(E)):
+        ax.imshow(marker, extent=[E[i] - marker_size / 2, E[i] + marker_size / 2, N[i] - marker_size / 2, N[i] + marker_size / 2])
 
     ax.set_xlabel("W-E (m)")
     ax.set_ylabel("S-N (m)")
@@ -41,6 +50,12 @@ def dec_to_rad(d, arc_m, arc_s):
     dec_rad = total_degrees * (np.pi/180)
 
     return dec_rad
+
+def deg_to_rad(degree):
+    return degree*np.pi/180
+
+def rad_to_deg(radiant):
+    return radiant*180/np.pi
 
 def lat_to_rad(d, arc_m, arc_s):
     total_degrees = d + arc_m/60 + arc_s/3600
@@ -69,7 +84,7 @@ def sky_model(point_sources):
     for m in range(len(m_range)):
         for l in range(len(l_range)):
             for point in point_sources:
-                sky_model[len(m_range)-m-1,l] += point[0] * np.exp(-((l_range[l] - point[1])**2 + (m_range[m] - point[2])**2) / (2 * sigma**2))
+                sky_model[len(m_range)-m-1,l] += point[0] * np.exp(-((l_range[l] - rad_to_deg(point[1]))**2 + (m_range[m] - rad_to_deg(point[2]))**2) / (2 * sigma**2))
 
     plt.imshow(sky_model, extent=(-lm_plane_size/2, lm_plane_size/2, -lm_plane_size/2, lm_plane_size/2), cmap = "jet")
     plt.colorbar(label='Brightness')
@@ -133,6 +148,7 @@ def visibilities(point_sources):
 
     fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,8))
 
+
     im1 = ax1.imshow(real_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap = "jet", aspect='auto')
     # ax1.colorbar(label='Magnitude of Visibilities')
     ax1.set_title('Real part of Visibility')
@@ -149,9 +165,6 @@ def visibilities(point_sources):
 
     plt.tight_layout()
     plt.show()
-
-
-    pass
 
 center_ra = center[0]
 center_dec = center[1]
@@ -232,10 +245,11 @@ paperino_flux = paperino_df['flux'][1]
 
 
 point_sources = [[1, 0, 0],[0.2, 0, 0.01832]]
+# point_sources = [[1, 0, 0],[0.2, deg_to_rad(0.3), deg_to_rad(0.3)]]
 
-# sky_model(point_sources)
+sky_model(point_sources)
 
-# visibilities(point_sources)
+visibilities(point_sources)
 
 
 #Calculating Baseline length, 
@@ -301,18 +315,29 @@ for i in range(N):
             pass
         count+=1
 
-u_max = np.max(np.abs(u_m))
-v_max = np.max(np.abs(v_m))
 
-for i in range(N):
-    for j in range(i+1,N):
-        u = u_m[i,j,:]
-        v = v_m[i,j,:]
 
-        plt.plot(u,v,"b")
-        plt.plot(-u,-v,"r")
+def plot_uv_track(u_m, v_m):
 
-plt.show() 
+    u_max = np.max(np.abs(u_m))
+    v_max = np.max(np.abs(v_m))
+    N = len(u_m)
+
+    for i in range(N):
+        for j in range(i+1,N):
+            u = u_m[i,j,:]
+            v = v_m[i,j,:]
+
+            plt.plot(u,v,"b")
+            plt.plot(-u,-v,"r")
+
+    plt.xlabel('u (rad^-1)')
+    plt.ylabel('v (rad^-1)')
+    plt.show() 
+
+plot_uv_track(u_m, v_m)
+
+
 
 
 
