@@ -17,7 +17,7 @@ class SimVis:
     plane_size: int = 10
     pixel_count: int = 500
     u_range: np.ndarray = np.linspace(-4000, 4000, 500)
-    v_range: np.ndarray = np.linspace(3000, -3000, 500)
+    v_range: np.ndarray = np.linspace(-3000, 3000, 500)
 
     config: Dict[str, Any] = field(default_factory=lambda: read_config())
     enu_coords: np.ndarray = field(default_factory=lambda: read_enu_coords())
@@ -47,7 +47,7 @@ class SimVis:
 
     @property
     def visibilities(self):
-        u, v = np.meshgrid(self.u_range, self.v_range)
+        u, v = np.meshgrid(self.u_range, self.v_range[::-1])
 
         vis = self._calculate_visibilities(
             self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis],
