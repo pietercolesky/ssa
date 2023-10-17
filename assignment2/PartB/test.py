@@ -316,6 +316,16 @@ for i in range(N):
         count+=1
 
 
+plt.plot(u_m[1,2,:], v_m[1,2,:], "b")
+plt.plot(u_m[2,1,:], v_m[2,1,:], "r")
+plt.show()
+plt.cla()
+plt.clf()
+
+for i in range(N):
+    for j in range(i+1,N):
+        u = u_m[i,j,:]
+        v = v_m[i,j,:]
 
 def plot_uv_track(u_m, v_m):
 
