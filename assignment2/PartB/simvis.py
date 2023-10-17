@@ -38,24 +38,19 @@ class SimVis:
 
         l_deg = self.skymodel_df["l"].map(to_deg).values
         m_deg = self.skymodel_df["m"].map(to_deg).values
-        model = self._delta(
-            self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis],
-            l, l_deg[:, np.newaxis, np.newaxis],
-            m, m_deg[:, np.newaxis, np.newaxis], self.sigma
-        )
-        return model
+
+        flux = self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis]
+        l0 = l_deg[:, np.newaxis, np.newaxis]
+        m0 = m_deg[:, np.newaxis, np.newaxis]
+        return np.sum(flux * np.exp(-((l - l0) ** 2 + (m - m0) ** 2) / (2 * self.sigma ** 2)), axis=0)
 
     @property
     def visibilities(self):
         u, v = np.meshgrid(self.u_range, self.v_range[::-1])
-
-        vis = self._calculate_visibilities(
-            self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis],
-            u, self.skymodel_df['l'].values[:, np.newaxis, np.newaxis],
-            v, self.skymodel_df['m'].values[:, np.newaxis, np.newaxis]
-        )
-
-        return vis
+        flux = self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis]
+        l0 = self.skymodel_df['l'].values[:, np.newaxis, np.newaxis]
+        m0 = self.skymodel_df['m'].values[:, np.newaxis, np.newaxis]
+        return np.sum(flux * np.exp(-2 * np.pi * (l0 * u + m0 * v) * 1j), axis=0)
 
     @property
     def baselines(self):
@@ -66,18 +61,12 @@ class SimVis:
         baselines_df["A"] = baselines_df["b"].map(lambda b: np.arctan(b[0] / b[1]))
         baselines_df["E"] = baselines_df["b"].map(lambda b: np.arctan(b[2] / la.norm(b[:2])))
         baselines_df["XYZ"] = baselines_df[["D", "A", "E"]].apply(
-            lambda baseline: self._get_xyz(baseline),axis=1
+            lambda baseline: self._get_xyz(baseline), axis=1
         )
         baselines_df["UVW"] = baselines_df["XYZ"].map(
-            lambda xyz: self._get_uvw(xyz, self.hour_angle_range, self.config["dec"], self.obs_wavelength)
+            lambda xyz: self._get_uvw(xyz)
         )
         return baselines_df
-
-    def _delta(self, flux, l, l0, m, m0, sigma):
-        return np.sum(flux * np.exp(-((l - l0) ** 2 + (m - m0) ** 2) / (2 * sigma ** 2)), axis=0)
-
-    def _calculate_visibilities(self, flux, u, l0, v, m0):
-        return np.sum(flux * np.exp(-2 * np.pi * (l0 * u + m0 * v) * 1j), axis=0)
 
     def _get_xyz(self, baseline):
         L = self.config["lat"]
@@ -88,13 +77,14 @@ class SimVis:
             np.sin(L) * np.sin(E) + np.cos(L) * np.cos(E) * np.cos(A)
         ])
 
-    def _get_uvw(self, xyz, h_range, dec, wavelength):
+    def _get_uvw(self, xyz):
+        dec = self.config["dec"]
         return list(map(
             lambda h: np.array([
                 [np.sin(h), np.cos(h), 0],
                 [-np.sin(dec) * np.cos(h), np.sin(dec) * np.sin(h), np.cos(dec)],
                 [np.cos(dec), -np.cos(dec) * np.sin(h), np.sin(dec)]
-            ]).dot(xyz) / wavelength, h_range
+            ]).dot(xyz) / self.obs_wavelength, self.hour_angle_range
         ))
 
     def _search(self, coords, col, min_val, max_val):
