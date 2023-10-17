@@ -23,8 +23,7 @@ def _calculate_m(src, dec_0):
 
 
 def read_enu_coords():
-    a = np.loadtxt(input_dir / 'antennae.txt')
-    return a
+    return np.loadtxt(input_dir / 'antennae.txt')
 
 
 def read_config():
