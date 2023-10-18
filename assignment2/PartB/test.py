@@ -247,9 +247,9 @@ paperino_flux = paperino_df['flux'][1]
 point_sources = [[1, 0, 0],[0.2, 0, 0.01832]]
 # point_sources = [[1, 0, 0],[0.2, deg_to_rad(0.3), deg_to_rad(0.3)]]
 
-sky_model(point_sources)
+# sky_model(point_sources)
 
-visibilities(point_sources)
+# visibilities(point_sources)
 
 
 #Calculating Baseline length, 
@@ -275,10 +275,11 @@ def XYZ_to_UVW(hour_angle, declination, wavelength, xyz_coordinate):
 num_steps = config["num_steps"]
 hour_angle_range = np.linspace(config['hour_angle_range'][0], config['hour_angle_range'][1], num_steps) * np.pi/12
 
-speed_of_light = 299792458 
-wavelength = speed_of_light/ (150*10**6)
 
-plot_antennas_2D(enu_coords)
+speed_of_light = 299792458 
+wavelength = speed_of_light/ (1.4 * 1e9)
+
+# plot_antennas_2D(enu_coords)
 
 N = len(enu_coords)
 B = (int)((N**2 - N)/2)
@@ -316,11 +317,11 @@ for i in range(N):
         count+=1
 
 
-plt.plot(u_m[1,2,:], v_m[1,2,:], "b")
-plt.plot(u_m[2,1,:], v_m[2,1,:], "r")
-plt.show()
-plt.cla()
-plt.clf()
+# plt.plot(u_m[1,2,:], v_m[1,2,:], "b")
+# plt.plot(u_m[2,1,:], v_m[2,1,:], "r")
+# plt.show()
+# plt.cla()
+# plt.clf()
 
 for i in range(N):
     for j in range(i+1,N):
@@ -345,7 +346,124 @@ def plot_uv_track(u_m, v_m):
     plt.ylabel('v (rad^-1)')
     plt.show() 
 
-plot_uv_track(u_m, v_m)
+# plot_uv_track(u_m, v_m)
+
+
+dish_diameter = 12
+b_max = max(baseline_lengths)
+delta_f = 92.91212 * 1e6
+
+lambda_0 = speed_of_light/ (1.4 * 1e9)
+
+
+# theta_p = lambda_0 / dish_diameter
+# theta_s = lambda_0 / b_max
+
+# omega_cell = theta_s **2
+
+# N_x = (int)(np.ceil((theta_p) / theta_s)*2)
+theta_p = 1800
+theta_s = 9
+N_x = 200
+
+u_min = -0.5 * N_x * theta_s
+u_max = 0.5 * N_x * theta_s 
+v_min = -0.5 * N_x * theta_s
+v_max = 0.5 * N_x * theta_s
+
+print(u_max)
+print(u_min)
+print(v_max)
+print(v_min)
+
+print(rad_to_deg(u_max) * 60)
+print(rad_to_deg(theta_s) * 60)
+
+
+
+fits_real = np.zeros((N_x, N_x), dtype=float)
+fits_imag = np.zeros((N_x, N_x), dtype=float)
+
+fits_real_map = np.zeros((N_x, N_x), dtype=float)
+fits_imag_map = np.zeros((N_x, N_x), dtype=float)
+
+shift = np.array([-u_min, -v_min])
+cell_sizes = np.array([theta_s, theta_s])
+
+N = len(u_m)
+
+for i in range(N):
+    for j in range(i+1,N):
+        u = u_m[i,j,:]
+        v = v_m[i,j,:]
+
+        for t in range(len(u)):
+            uv_point = np.array([u[t],v[t]])
+            shifted_point = uv_point + shift
+            if shifted_point[0]>= 0 and shifted_point[0] < theta_p and shifted_point[1] >= 0 and shifted_point[1] < theta_p:
+                u_cell_index = (int)(shifted_point[0] / theta_s)
+                v_cell_index = (int)(shifted_point[1] / theta_s)
+                for point_source in point_sources:
+                    fits_real[N_x - v_cell_index - 1, u_cell_index] += -point_source[0] * np.sin(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
+                    fits_imag[N_x - v_cell_index - 1, u_cell_index] += point_source[0] * np.cos(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
+                    fits_real_map[N_x - v_cell_index - 1, u_cell_index] = 1
+                    fits_imag_map[N_x - v_cell_index - 1, u_cell_index] = 1
+
+for i in range(N):
+    for j in range(i+1,N):
+        u = -u_m[i,j,:]
+        v = -v_m[i,j,:]
+
+        for t in range(len(u)):
+            uv_point = np.array([u[t],v[t]])
+            shifted_point = uv_point + shift
+            if shifted_point[0]>= 0 and shifted_point[0] < theta_p and shifted_point[1] >= 0 and shifted_point[1] < theta_p:
+                u_cell_index = (int)(shifted_point[0] / theta_s)
+                v_cell_index = (int)(shifted_point[1] / theta_s)
+                for point_source in point_sources:
+                    fits_real[N_x - v_cell_index - 1, u_cell_index] += -point_source[0] * np.sin(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
+                    fits_imag[N_x - v_cell_index - 1, u_cell_index] += point_source[0] * np.cos(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
+                    fits_real_map[N_x - v_cell_index - 1, u_cell_index] = 1
+                    fits_imag_map[N_x - v_cell_index - 1, u_cell_index] = 1
+
+
+print(fits_real)
+
+plt.imshow(fits_real, cmap="jet", interpolation='nearest')
+plt.colorbar()
+plt.show()
+
+plt.cla()
+plt.clf()
+
+plt.imshow(fits_real_map, cmap="gray", interpolation='nearest')
+plt.colorbar()
+plt.show()
+
+plt.cla()
+plt.clf()
+
+plt.imshow(fits_imag, cmap="jet", interpolation='nearest')
+plt.colorbar()
+plt.show()
+
+plt.cla()
+plt.clf()
+
+plt.imshow(fits_imag_map, cmap="gray", interpolation='nearest')
+plt.colorbar()
+plt.show()
+
+plt.cla()
+plt.clf()
+
+
+
+
+
+
+#Gridding
+
 
 
 

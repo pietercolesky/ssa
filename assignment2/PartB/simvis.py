@@ -14,6 +14,10 @@ class simvis():
         self.antenna_ENU = antenna_ENU
         self.point_sources = point_sources
         self.nsteps = nsteps
+        self.N = len(enu_coords)
+        self.B = (int)((self.N**2 - self.N)/2)
+        self.speed_of_light = 299792458 
+        self.wavelength = self.speed_of_light/ (self.freq * 1e9)
         pass
 
     def plot_antennas_3D(self):
@@ -70,8 +74,8 @@ class simvis():
         ax.set_ylim([-max_N - (1/3)*max_N, max_N + (1/3)*max_N])
 
         plt.show()
-        plt.cla()
-        plt.clf()
+        # plt.cla()
+        # plt.clf()
 
     def ra_to_rad(self, h, m, s):
         ra_h = h + (m / 60) + (s/3600)
@@ -126,8 +130,10 @@ class simvis():
         plt.ylabel('m (degrees)')
         plt.title('Skymodel (in brightness)')
         plt.show()
+        plt.cla()
+        plt.clf()
 
-    def real_visibility(self):
+    def plot_real_visibility(self):
         u_range = np.linspace(-4000, 4000, 500)
         v_range = np.linspace(-3000, 3000, 500)
 
@@ -145,8 +151,10 @@ class simvis():
         plt.ylabel('v (rad^-1)')
         plt.title('Real part of Visibility')
         plt.show()
+        plt.cla()
+        plt.clf()
 
-    def imaginary_visibility(self):
+    def plot_imaginary_visibility(self):
         u_range = np.linspace(-4000, 4000, 500)
         v_range = np.linspace(-3000, 3000, 500)
 
@@ -164,9 +172,11 @@ class simvis():
         plt.ylabel('v (rad^-1)')
         plt.title('Imaginary part of Visibility')
         plt.show()
+        plt.cla()
+        plt.clf()
         pass
 
-    def visibilities(self):
+    def plot_visibilities(self):
         u_range = np.linspace(-4000, 4000, 500)
         v_range = np.linspace(-3000, 3000, 500)
 
@@ -199,15 +209,17 @@ class simvis():
 
         plt.tight_layout()
         plt.show()
+        plt.cla()
+        plt.clf()
 
-    def ENU_to_XYZ(azimith, elevation, distance, latitude):
+    def ENU_to_XYZ(self, azimith, elevation, distance, latitude):
         XYZ_coordinate = distance*np.array([np.cos(latitude)*np.sin(elevation) - np.sin(latitude)*np.cos(elevation)*np.cos(azimith),
                                 np.cos(elevation)*np.sin(azimith),
                                 np.sin(latitude)*np.sin(elevation) + np.cos(latitude)*np.cos(elevation)*np.cos(azimith)])
         
         return XYZ_coordinate
 
-    def XYZ_to_UVW(hour_angle, declination, wavelength, xyz_coordinate):
+    def XYZ_to_UVW(self, hour_angle, declination, wavelength, xyz_coordinate):
         matrix = np.array([[np.sin(hour_angle), np.cos(hour_angle), 0],
                                 [-np.sin(declination)*np.cos(hour_angle), np.sin(declination)*np.sin(hour_angle), np.cos(declination)],
                                 [np.cos(declination), -np.cos(declination)*np.sin(hour_angle), np.sin(declination)]])
@@ -215,6 +227,54 @@ class simvis():
         uvw_coordinate = matrix.dot(xyz_coordinate/ wavelength)
 
         return uvw_coordinate
+
+    def uv_tracks(self):
+        baseline_lengths = [0.0]*self.B
+        azimiths = [0.0]*self.B
+        elevations = [0.0]*self.B
+
+        hour_angle_range = np.linspace(self.h_min, self.h_max, self.nsteps) * np.pi/12
+
+        self.u_m = np.zeros((self.N,self.N,self.nsteps),dtype=float) 
+        self.v_m = np.zeros((self.N,self.N,self.nsteps),dtype=float)
+        self.w_m = np.zeros((self.N,self.N,self.nsteps),dtype=float)  
+
+        count = 0
+        for i in range(self.N):
+            for j in range(i+1, self.N):
+                baseline_lengths[count] = np.sqrt(np.sum((self.antenna_ENU[i] - self.antenna_ENU[j])**2))
+                azimiths[count] = np.arctan2(self.antenna_ENU[j,0] - self.antenna_ENU[i,0], self.antenna_ENU[j,1] - self.antenna_ENU[i,1])
+                elevations[count] = np.arcsin((self.antenna_ENU[j,2] - self.antenna_ENU[i,2])/baseline_lengths[count]) 
+
+                #Calculating the XYZ coordinates
+                xyz_coordinate = self.ENU_to_XYZ(azimiths[count], elevations[count], baseline_lengths[count], lat_to_rad(*self.lat))
+                #Calculating UVW coordinates for all baselines for all hourangles
+                for n in range(self.nsteps):
+                    uvw_coordinate = self.XYZ_to_UVW(hour_angle_range[n],dec_to_rad(*self.dec),self.wavelength,xyz_coordinate)
+                    self.u_m[i,j,n] = uvw_coordinate[0]
+                    self.u_m[j,i,n] = -uvw_coordinate[0]
+                    self.v_m[i,j,n] = uvw_coordinate[1]
+                    self.v_m[j,i,n] = -uvw_coordinate[1]
+                    self.w_m[i,j,n] = uvw_coordinate[2]
+                    self.w_m[j,i,n] = -uvw_coordinate[2]
+
+                count+=1
+        pass
+
+    def plot_uv_track(self):
+        for i in range(self.N):
+            for j in range(i+1,self.N):
+                u = self.u_m[i,j,:]
+                v = self.v_m[i,j,:]
+
+                plt.plot(u,v,"b")
+                plt.plot(-u,-v,"r")
+
+        plt.xlabel('u (rad^-1)')
+        plt.ylabel('v (rad^-1)')
+        plt.show() 
+        plt.cla()
+        plt.clf()
 
 def ra_to_rad(h, m, s):
     ra_h = h + (m / 60) + (s/3600)
@@ -276,14 +336,12 @@ def main():
     declination = config['declination']
     latitude = config["lat"]
     freq = config["obs_freq"]
-    right_ascention = config["right_asc"]
 
-
-
-
-
-
-    s = simvis(h_min=h_min, h_max=h_max, antenna_ENU=enu_coords, point_sources=point_sources, nsteps=num_steps)
+    s = simvis(h_min=h_min, h_max=h_max, dec=declination, lat=latitude, freq=freq, antenna_ENU=enu_coords, point_sources=point_sources, nsteps=num_steps)
+    s.plot_antennas_2D()
+    s.plot_visibilities()
+    s.uv_tracks()
+    s.plot_uv_track()
     pass
 
 if __name__ == "__main__":
