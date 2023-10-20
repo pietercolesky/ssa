@@ -47,7 +47,7 @@ class SimVis:
 
         self._grid()
 
-        self.psf = np.fft.fft2(self.gridded_uv)
+        self.psf = np.fft.fftshift(np.fft.fft2(self.gridded_uv))
 
         obs_img = np.abs(np.fft.fftshift(np.fft.fft2(self.gridded_vis)))
         self.obs_img = scale(obs_img, self.skymodel_df["flux"].max())
@@ -179,7 +179,7 @@ class SimVis:
 
     def plot_psf(self):
         size = self.img_conf["plane_size"] / 2
-        plt.imshow(log_scale(np.fft.fftshift(self.psf)), extent=(-size, size, -size, size))
+        plt.imshow(log_scale(self.psf), extent=(-size, size, -size, size))
         plt.xlabel(r"l ($^{\circ})$")
         plt.ylabel(r"m ($^{\circ})$")
         plt.title('PSF')
@@ -232,7 +232,7 @@ class SimVis:
             u_max = np.ceil(u_range[-1])
             v_max = np.ceil(v_range[-1])
 
-            plt.figure(figsize=(4, 6))
+            plt.figure(figsize=(5, 6))
             plt.imshow(log_scale(visibilities), extent=(u_min, u_max, v_min, v_max), cmap="jet")
             plt.xlabel(r"u (rad$^{-1})$")
             plt.ylabel(r"v (rad$^{-1})$")
@@ -242,7 +242,7 @@ class SimVis:
             plt.savefig(self.results_dir / f"vis_b_{baseline}_amp.png")
             plt.close()
 
-            plt.figure(figsize=(4, 6))
+            plt.figure(figsize=(5, 6))
             plt.imshow(np.angle(visibilities), extent=(u_min, u_max, v_min, v_max), cmap='jet')
             plt.xlabel(r"u (rad$^{-1})$")
             plt.ylabel(r"v (rad$^{-1})$")
