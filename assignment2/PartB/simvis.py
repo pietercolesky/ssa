@@ -23,12 +23,12 @@ class SimVis:
     def __post_init__(self):
         self.results_dir.mkdir(parents=True, exist_ok=True)
 
-        self.Nx = self.Ny = self.img_conf["num_pixels"]
         self.obs_wavelength = 299792458 / (self.config['obs_freq'] * 10 ** 9)
         self.hour_angle_range = np.linspace(self.config["hour_angle_range"][0], self.config["hour_angle_range"][1],
                                             self.config["num_steps"])
 
         cell_size = self.img_conf["cell_size"]
+        self.Nx = self.Ny = self.img_conf["num_pixels"]
         self.u_min = -0.5 * self.Nx * cell_size
         self.v_min = -0.5 * self.Ny * cell_size
         self.u_max = -self.u_min
