@@ -1,6 +1,25 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+from PIL import Image, ImageDraw
+import scipy.linalg as sla
+import math
+import random
+import cv2
+
+def scale(x):
+  return (x / np.max(x)) * 255
+
+def log_scale(x):
+  log_abs = np.log(np.abs(x) + 1)
+
+  return scale(log_abs)
+
+def show_image(image:Image.Image):
+    plt.imshow(image)
+    plt.colorbar()
+    plt.axis('off')
+    plt.show()
 
 center = [[5,30,0],[0,0,0]]
 betelgeuse = [[5 , 55, 10.3053],[7,24,25.426]]
@@ -71,7 +90,7 @@ def lm_coordinates(ra_0, dec_0, ra, dec):
 
     return [l,m]
 
-def sky_model(point_sources):
+def sky_model(point_sources, plot):
     sigma = 0.1
     lm_plane_size = 10
     pixel_count = 500
@@ -86,12 +105,16 @@ def sky_model(point_sources):
             for point in point_sources:
                 sky_model[len(m_range)-m-1,l] += point[0] * np.exp(-((l_range[l] - rad_to_deg(point[1]))**2 + (m_range[m] - rad_to_deg(point[2]))**2) / (2 * sigma**2))
 
-    plt.imshow(sky_model, extent=(-lm_plane_size/2, lm_plane_size/2, -lm_plane_size/2, lm_plane_size/2), cmap = "jet")
-    plt.colorbar(label='Brightness')
-    plt.xlabel('l (degrees)')
-    plt.ylabel('m (degrees)')
-    plt.title('Skymodel (in brightness)')
-    plt.show()
+    if plot:
+        plt.imshow(sky_model, extent=(-lm_plane_size/2, lm_plane_size/2, -lm_plane_size/2, lm_plane_size/2), cmap = "jet")
+        plt.colorbar(label='Brightness')
+        plt.xlabel('l (degrees)')
+        plt.ylabel('m (degrees)')
+        plt.title('Skymodel (in brightness)')
+        plt.savefig('skymodel.png')
+        plt.show()
+
+    return sky_model
 
 def real_visibility(point_sources):
     u_range = np.linspace(-4000, 4000, 500)
@@ -132,39 +155,44 @@ def imaginary_visibility(point_sources):
     plt.show()
     pass
 
-def visibilities(point_sources):
-    u_range = np.linspace(-4000, 4000, 500)
-    v_range = np.linspace(-3000, 3000, 500)
+def visibilities(point_sources, plot):
+    u_range = np.linspace(-900, 900, 500)
+    v_range = np.linspace(-900, 900, 500)
 
     real_visibilities = np.zeros((len(u_range), len(v_range)))
     imaginary_visibilities = np.zeros((len(u_range), len(v_range)))
+    complex_visibilities = np.zeros((len(u_range), len(v_range)), dtype=complex)
 
     for v in range(len(v_range)):
         for u in range(len(u_range)):
             for point in point_sources:
                 imaginary_visibilities[len(v_range)-v-1,u] += -point[0] * np.sin(2 * np.pi * (point[1] * u_range[u] + point[2] * v_range[v]))
                 real_visibilities[len(v_range)-v-1,u] += point[0] * np.cos(2 * np.pi * (point[1] * u_range[u] + point[2] * v_range[v]))
+                complex_visibilities[len(v_range)-v-1,u] += point[0] * np.exp(-2 * np.pi * 1j * (point[1] * u_range[u] + point[2] * v_range[v]))
+
+    if plot:
+        fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,8))
 
 
-    fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,8))
 
+        im1 = ax1.imshow(real_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap = "jet", aspect='auto')
+        # ax1.colorbar(label='Magnitude of Visibilities')
+        ax1.set_title('Real part of Visibility')
+        ax1.set_xlabel('u (rad^-1)')
+        ax1.set_ylabel('v (rad^-1)')
+        cbar = fig.colorbar(im1, ax=ax1, label='Magnitude of Visibilities')
 
-    im1 = ax1.imshow(real_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap = "jet", aspect='auto')
-    # ax1.colorbar(label='Magnitude of Visibilities')
-    ax1.set_title('Real part of Visibility')
-    ax1.set_xlabel('u (rad^-1)')
-    ax1.set_ylabel('v (rad^-1)')
-    cbar = fig.colorbar(im1, ax=ax1, label='Magnitude of Visibilities')
+        im2 = ax2.imshow(imaginary_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap = "jet", aspect='auto')
+        # ax1.colorbar(label='Magnitude of Visibilities')
+        ax2.set_title('Imaginary part of Visibility')
+        ax2.set_xlabel('u (rad^-1)')
+        ax2.set_ylabel('v (rad^-1)')
+        cbar = fig.colorbar(im2, ax=ax2, label='Magnitude of Visibilities')
 
-    im2 = ax2.imshow(imaginary_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap = "jet", aspect='auto')
-    # ax1.colorbar(label='Magnitude of Visibilities')
-    ax2.set_title('Imaginary part of Visibility')
-    ax2.set_xlabel('u (rad^-1)')
-    ax2.set_ylabel('v (rad^-1)')
-    cbar = fig.colorbar(im2, ax=ax2, label='Magnitude of Visibilities')
-
-    plt.tight_layout()
-    plt.show()
+        plt.tight_layout()
+        plt.show()
+    
+    return complex_visibilities
 
 center_ra = center[0]
 center_dec = center[1]
@@ -247,9 +275,11 @@ paperino_flux = paperino_df['flux'][1]
 point_sources = [[1, 0, 0],[0.2, 0, 0.01832]]
 # point_sources = [[1, 0, 0],[0.2, deg_to_rad(0.3), deg_to_rad(0.3)]]
 
-# sky_model(point_sources)
+s_m = sky_model(point_sources, False)
 
-# visibilities(point_sources)
+
+
+
 
 
 #Calculating Baseline length, 
@@ -363,8 +393,8 @@ lambda_0 = speed_of_light/ (1.4 * 1e9)
 
 # N_x = (int)(np.ceil((theta_p) / theta_s)*2)
 theta_p = 1800
-theta_s = 9
-N_x = 200
+theta_s = 3.6
+N_x = 500
 
 u_min = -0.5 * N_x * theta_s
 u_max = 0.5 * N_x * theta_s 
@@ -383,9 +413,8 @@ print(rad_to_deg(theta_s) * 60)
 
 fits_real = np.zeros((N_x, N_x), dtype=float)
 fits_imag = np.zeros((N_x, N_x), dtype=float)
-
-fits_real_map = np.zeros((N_x, N_x), dtype=float)
-fits_imag_map = np.zeros((N_x, N_x), dtype=float)
+fits_complex = np.zeros((N_x, N_x), dtype=complex)
+fits_map = np.zeros((N_x, N_x), dtype=float)
 
 shift = np.array([-u_min, -v_min])
 cell_sizes = np.array([theta_s, theta_s])
@@ -404,10 +433,10 @@ for i in range(N):
                 u_cell_index = (int)(shifted_point[0] / theta_s)
                 v_cell_index = (int)(shifted_point[1] / theta_s)
                 for point_source in point_sources:
+                    fits_complex[N_x - v_cell_index - 1, u_cell_index] += point_source[0] * np.exp(-2*np.pi *1j*(point_source[1] * uv_point[0] + point_source[2]*uv_point[1]))
                     fits_real[N_x - v_cell_index - 1, u_cell_index] += -point_source[0] * np.sin(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
                     fits_imag[N_x - v_cell_index - 1, u_cell_index] += point_source[0] * np.cos(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
-                    fits_real_map[N_x - v_cell_index - 1, u_cell_index] = 1
-                    fits_imag_map[N_x - v_cell_index - 1, u_cell_index] = 1
+                    fits_map[N_x - v_cell_index - 1, u_cell_index] = 1
 
 for i in range(N):
     for j in range(i+1,N):
@@ -421,41 +450,92 @@ for i in range(N):
                 u_cell_index = (int)(shifted_point[0] / theta_s)
                 v_cell_index = (int)(shifted_point[1] / theta_s)
                 for point_source in point_sources:
+                    fits_complex[N_x - v_cell_index - 1, u_cell_index] += point_source[0] * np.exp(-2*np.pi *1j*(point_source[1] * uv_point[0] + point_source[2]*uv_point[1]))
                     fits_real[N_x - v_cell_index - 1, u_cell_index] += -point_source[0] * np.sin(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
                     fits_imag[N_x - v_cell_index - 1, u_cell_index] += point_source[0] * np.cos(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
-                    fits_real_map[N_x - v_cell_index - 1, u_cell_index] = 1
-                    fits_imag_map[N_x - v_cell_index - 1, u_cell_index] = 1
+                    fits_map[N_x - v_cell_index - 1, u_cell_index] = 1
 
-
-print(fits_real)
+show_image(fits_real)
+show_image(fits_imag)
+show_image(fits_map)
 
 plt.imshow(fits_real, cmap="jet", interpolation='nearest')
 plt.colorbar()
-plt.show()
+# plt.show()
 
 plt.cla()
 plt.clf()
 
-plt.imshow(fits_real_map, cmap="gray", interpolation='nearest')
+plt.imshow(fits_map, cmap="gray", interpolation='nearest')
 plt.colorbar()
-plt.show()
+# plt.show()
 
 plt.cla()
 plt.clf()
 
 plt.imshow(fits_imag, cmap="jet", interpolation='nearest')
 plt.colorbar()
-plt.show()
+# plt.show()
 
 plt.cla()
 plt.clf()
 
-plt.imshow(fits_imag_map, cmap="gray", interpolation='nearest')
-plt.colorbar()
-plt.show()
 
-plt.cla()
-plt.clf()
+
+
+# fits_real_dft = np.fft.fft2(fits_real)
+# fits_real_dft_shifted = np.fft.fftshift(fits_real_dft)
+# show_image(log_scale(fits_real_dft_shifted))
+
+# show_image(s_m)
+# psf = np.fft.fft2(s_m)
+# psf_shifted = np.fft.fftshift(psf)
+# show_image(log_scale(psf_shifted))
+# show_image(np.angle(psf_shifted))
+
+# ifft = np.fft.ifft2(psf).real
+# show_image(ifft)
+
+
+# ifft_imag = np.fft.ifft2(psf).imag
+# show_image(ifft_imag)
+
+def circularSamplingMap(imgSize, outer, inner=0):
+    """Return a circular sampling map of size [imgSize, imgSize]
+    imgSize: image size in pixels
+    outer: outer radius (in pixels) to exclude sampling above
+    inner: inner radius (in pixels) to exclude sampling below"""
+    zeros = np.zeros((imgSize,imgSize), dtype='float')
+    ones = np.ones((imgSize,imgSize), dtype='float')
+    xpos, ypos = np.mgrid[0:imgSize,0:imgSize]
+    radius = np.sqrt((xpos - imgSize/2)**2. + (ypos - imgSize/2)**2.)
+    sampling = np.where((outer >= radius) & (radius >= inner), ones, zeros)
+    return sampling
+
+sampling0 = circularSamplingMap(500, 10, 0)
+complex_visibilities = visibilities(point_sources, False)
+
+show_image(s_m)
+fft_sky = np.fft.fftshift(np.fft.fft2(s_m))
+show_image(log_scale(fft_sky.real))
+show_image(np.abs(complex_visibilities.real))
+# show_image(log_scale(np.abs(fft_sky)))
+
+# show_image(np.abs(np.fft.fftshift(np.fft.fft2(fits_map))))
+
+show_image(log_scale((fits_map * fft_sky)))
+show_image(log_scale((fits_complex)))
+
+reformed_sky = np.abs(np.fft.ifft2(np.fft.fftshift(fits_map * fft_sky)))
+reformed_sky2 = np.abs(np.fft.ifft2(fits_complex))
+show_image(reformed_sky)
+show_image(reformed_sky2)
+
+reformed_sky3 = np.abs(np.fft.ifft2(np.fft.fftshift(complex_visibilities)))
+
+
+# show_image(np.abs(complex_visibilities))
+# show_image(np.angle(complex_visibilities))
 
 
 

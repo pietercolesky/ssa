@@ -109,7 +109,7 @@ class simvis():
 
         return [l,m]
     
-    def sky_model(self):
+    def sky_model(self, plot):
         sigma = 0.1
         lm_plane_size = 10
         pixel_count = 500
@@ -117,23 +117,24 @@ class simvis():
         l_range = np.linspace(-lm_plane_size/2, lm_plane_size/2, pixel_count)
         m_range = np.linspace(-lm_plane_size/2, lm_plane_size/2, pixel_count)
 
-        sky_model = np.zeros((pixel_count, pixel_count))
+        self.skymodel = np.zeros((pixel_count, pixel_count))
 
         for m in range(len(m_range)):
             for l in range(len(l_range)):
                 for point in self.point_sources:
-                    sky_model[len(m_range)-m-1,l] += point[0] * np.exp(-((l_range[l] - self.rad_to_deg(point[1]))**2 + (m_range[m] - self.rad_to_deg(point[2]))**2) / (2 * sigma**2))
+                    self.skymodel[len(m_range)-m-1,l] += point[0] * np.exp(-((l_range[l] - self.rad_to_deg(point[1]))**2 + (m_range[m] - self.rad_to_deg(point[2]))**2) / (2 * sigma**2))
 
-        plt.imshow(sky_model, extent=(-lm_plane_size/2, lm_plane_size/2, -lm_plane_size/2, lm_plane_size/2), cmap = "jet")
-        plt.colorbar(label='Brightness')
-        plt.xlabel('l (degrees)')
-        plt.ylabel('m (degrees)')
-        plt.title('Skymodel (in brightness)')
-        plt.show()
-        plt.cla()
-        plt.clf()
+        if plot:
+            plt.imshow(self.skymodel, extent=(-lm_plane_size/2, lm_plane_size/2, -lm_plane_size/2, lm_plane_size/2), cmap = "jet")
+            plt.colorbar(label='Brightness')
+            plt.xlabel('l (degrees)')
+            plt.ylabel('m (degrees)')
+            plt.title('Skymodel (in brightness)')
+            plt.show()
+            plt.cla()
+            plt.clf()
 
-    def plot_real_visibility(self):
+    def plot_real_visibility(self, plot):
         u_range = np.linspace(-4000, 4000, 500)
         v_range = np.linspace(-3000, 3000, 500)
 
@@ -144,17 +145,18 @@ class simvis():
                 for point in self.point_sources:
                     real_visibilities[len(v_range)-v-1,u] += point[0] * np.cos(2 * np.pi * (point[1] * u_range[u] + point[2] * v_range[v]))
 
-        plt.figure(figsize=(10, 6))
-        plt.imshow(real_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap = "jet")
-        plt.colorbar(label='Magnitude of Visibilities')
-        plt.xlabel('u (rad^-1)')
-        plt.ylabel('v (rad^-1)')
-        plt.title('Real part of Visibility')
-        plt.show()
-        plt.cla()
-        plt.clf()
+        if plot:
+            plt.figure(figsize=(10, 6))
+            plt.imshow(real_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap = "jet")
+            plt.colorbar(label='Magnitude of Visibilities')
+            plt.xlabel('u (rad^-1)')
+            plt.ylabel('v (rad^-1)')
+            plt.title('Real part of Visibility')
+            plt.show()
+            plt.cla()
+            plt.clf()
 
-    def plot_imaginary_visibility(self):
+    def plot_imaginary_visibility(self, plot):
         u_range = np.linspace(-4000, 4000, 500)
         v_range = np.linspace(-3000, 3000, 500)
 
@@ -165,52 +167,55 @@ class simvis():
                 for point in self.point_sources:
                     imaginary_visibilities[len(v_range)-v-1,u] += -point[0] * np.sin(2 * np.pi * (point[1] * u_range[u] + point[2] * v_range[v]))
 
-        plt.figure(figsize=(10, 6))
-        plt.imshow(imaginary_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap='jet')
-        plt.colorbar(label='Magnitude of Visibilities')
-        plt.xlabel('u (rad^-1)')
-        plt.ylabel('v (rad^-1)')
-        plt.title('Imaginary part of Visibility')
-        plt.show()
-        plt.cla()
-        plt.clf()
+        if plot:
+            plt.figure(figsize=(10, 6))
+            plt.imshow(imaginary_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap='jet')
+            plt.colorbar(label='Magnitude of Visibilities')
+            plt.xlabel('u (rad^-1)')
+            plt.ylabel('v (rad^-1)')
+            plt.title('Imaginary part of Visibility')
+            plt.show()
+            plt.cla()
+            plt.clf()
         pass
 
-    def plot_visibilities(self):
-        u_range = np.linspace(-4000, 4000, 500)
-        v_range = np.linspace(-3000, 3000, 500)
+    def plot_visibilities(self, plot, u_r=900, v_r=900, size=500):
+        u_range = np.linspace(-u_r, u_r, size)
+        v_range = np.linspace(-v_r, v_r, size)
 
-        real_visibilities = np.zeros((len(u_range), len(v_range)))
-        imaginary_visibilities = np.zeros((len(u_range), len(v_range)))
+        self.real_visibilities = np.zeros((len(u_range), len(v_range)))
+        self.imaginary_visibilities = np.zeros((len(u_range), len(v_range)))
+        self.complex_visibilities = np.zeros((len(u_range), len(v_range)), dtype=complex)
 
         for v in range(len(v_range)):
             for u in range(len(u_range)):
                 for point in self.point_sources:
-                    imaginary_visibilities[len(v_range)-v-1,u] += -point[0] * np.sin(2 * np.pi * (point[1] * u_range[u] + point[2] * v_range[v]))
-                    real_visibilities[len(v_range)-v-1,u] += point[0] * np.cos(2 * np.pi * (point[1] * u_range[u] + point[2] * v_range[v]))
+                    self.imaginary_visibilities[len(v_range)-v-1,u] += -point[0] * np.sin(2 * np.pi * (point[1] * u_range[u] + point[2] * v_range[v]))
+                    self.real_visibilities[len(v_range)-v-1,u] += point[0] * np.cos(2 * np.pi * (point[1] * u_range[u] + point[2] * v_range[v]))
+                    self.complex_visibilities[len(v_range)-v-1,u] += point[0] * np.exp(-2 * np.pi * 1j * (point[1] * u_range[u] + point[2] * v_range[v]))
 
+        
 
-        fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,8))
+        if plot:
+            fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,8))
+            im1 = ax1.imshow(self.real_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap = "jet", aspect='auto')
+            # ax1.colorbar(label='Magnitude of Visibilities')
+            ax1.set_title('Real part of Visibility')
+            ax1.set_xlabel('u (rad^-1)')
+            ax1.set_ylabel('v (rad^-1)')
+            cbar = fig.colorbar(im1, ax=ax1, label='Magnitude of Visibilities')
 
+            im2 = ax2.imshow(self.imaginary_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap = "jet", aspect='auto')
+            # ax1.colorbar(label='Magnitude of Visibilities')
+            ax2.set_title('Imaginary part of Visibility')
+            ax2.set_xlabel('u (rad^-1)')
+            ax2.set_ylabel('v (rad^-1)')
+            cbar = fig.colorbar(im2, ax=ax2, label='Magnitude of Visibilities')
 
-        im1 = ax1.imshow(real_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap = "jet", aspect='auto')
-        # ax1.colorbar(label='Magnitude of Visibilities')
-        ax1.set_title('Real part of Visibility')
-        ax1.set_xlabel('u (rad^-1)')
-        ax1.set_ylabel('v (rad^-1)')
-        cbar = fig.colorbar(im1, ax=ax1, label='Magnitude of Visibilities')
-
-        im2 = ax2.imshow(imaginary_visibilities, extent=(u_range.min(), u_range.max(), v_range.min(), v_range.max()), cmap = "jet", aspect='auto')
-        # ax1.colorbar(label='Magnitude of Visibilities')
-        ax2.set_title('Imaginary part of Visibility')
-        ax2.set_xlabel('u (rad^-1)')
-        ax2.set_ylabel('v (rad^-1)')
-        cbar = fig.colorbar(im2, ax=ax2, label='Magnitude of Visibilities')
-
-        plt.tight_layout()
-        plt.show()
-        plt.cla()
-        plt.clf()
+            plt.tight_layout()
+            plt.show()
+            plt.cla()
+            plt.clf()
 
     def ENU_to_XYZ(self, azimith, elevation, distance, latitude):
         XYZ_coordinate = distance*np.array([np.cos(latitude)*np.sin(elevation) - np.sin(latitude)*np.cos(elevation)*np.cos(azimith),
@@ -273,8 +278,89 @@ class simvis():
         plt.xlabel('u (rad^-1)')
         plt.ylabel('v (rad^-1)')
         plt.show() 
-        plt.cla()
-        plt.clf()
+
+    def grid(self, N_x=500, theta_p=1800):
+        self.N_x = N_x
+        self.theta_p = theta_p
+
+        self.theta_s = theta_p / N_x
+        self.u_min = -0.5 * N_x * self.theta_s
+        self.u_max = 0.5 * N_x * self.theta_s 
+        self.v_min = -0.5 * N_x * self.theta_s
+        self.v_max = 0.5 * N_x * self.theta_s
+
+        self.fits_real = np.zeros((self.N_x, self.N_x), dtype=float)
+        self.fits_imag = np.zeros((self.N_x, self.N_x), dtype=float)
+        self.fits_complex = np.zeros((self.N_x, self.N_x), dtype=complex)
+        self.fits_map = np.zeros((self.N_x, self.N_x), dtype=float)
+
+        shift = np.array([-self.u_min, -self.v_min])
+
+        for i in range(self.N):
+            for j in range(i+1,self.N):
+                u = self.u_m[i,j,:]
+                v = self.v_m[i,j,:]
+
+                for t in range(len(u)):
+                    uv_point = np.array([u[t],v[t]])
+                    shifted_point = uv_point + shift
+                    if shifted_point[0]>= 0 and shifted_point[0] < theta_p and shifted_point[1] >= 0 and shifted_point[1] < theta_p:
+                        u_cell_index = (int)(shifted_point[0] / self.theta_s)
+                        v_cell_index = (int)(shifted_point[1] / self.theta_s)
+                        for point_source in self.point_sources:
+                            self.fits_complex[N_x - v_cell_index - 1, u_cell_index] += point_source[0] * np.exp(-2*np.pi *1j*(point_source[1] * uv_point[0] + point_source[2]*uv_point[1]))
+                            self.fits_real[N_x - v_cell_index - 1, u_cell_index] += -point_source[0] * np.sin(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
+                            self.fits_imag[N_x - v_cell_index - 1, u_cell_index] += point_source[0] * np.cos(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
+                            self.fits_map[N_x - v_cell_index - 1, u_cell_index] = 1
+
+        for i in range(self.N):
+            for j in range(i+1,self.N):
+                u = -self.u_m[i,j,:]
+                v = -self.v_m[i,j,:]
+
+                for t in range(len(u)):
+                    uv_point = np.array([u[t],v[t]])
+                    shifted_point = uv_point + shift
+                    if shifted_point[0]>= 0 and shifted_point[0] < theta_p and shifted_point[1] >= 0 and shifted_point[1] < theta_p:
+                        u_cell_index = (int)(shifted_point[0] / self.theta_s)
+                        v_cell_index = (int)(shifted_point[1] / self.theta_s)
+                        for point_source in self.point_sources:
+                            self.fits_complex[N_x - v_cell_index - 1, u_cell_index] += point_source[0] * np.exp(-2*np.pi *1j*(point_source[1] * uv_point[0] + point_source[2]*uv_point[1]))
+                            self.fits_real[N_x - v_cell_index - 1, u_cell_index] += -point_source[0] * np.sin(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
+                            self.fits_imag[N_x - v_cell_index - 1, u_cell_index] += point_source[0] * np.cos(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
+                            self.fits_map[N_x - v_cell_index - 1, u_cell_index] = 1
+
+    def plot_grid_real(self):
+            fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,8))
+            im1 = ax1.imshow(self.fits_real, extent=(self.u_min, self.u_max, self.v_min, self.v_max), cmap = "jet", aspect='auto')
+            # ax1.colorbar(label='Magnitude of Visibilities')
+            ax1.set_title('Real part of Gridded Visibility')
+            ax1.set_xlabel('u (rad^-1)')
+            ax1.set_ylabel('v (rad^-1)')
+            cbar = fig.colorbar(im1, ax=ax1, label='Magnitude of Visibilities')
+
+            im2 = ax2.imshow(self.fits_imag, extent=(self.u_min, self.u_max, self.v_min, self.v_max), cmap = "jet", aspect='auto')
+            # ax1.colorbar(label='Magnitude of Visibilities')
+            ax2.set_title('Imaginary part of Gridded Visibility')
+            ax2.set_xlabel('u (rad^-1)')
+            ax2.set_ylabel('v (rad^-1)')
+            cbar = fig.colorbar(im2, ax=ax2, label='Magnitude of Visibilities')
+
+            plt.tight_layout()
+            plt.show()
+            plt.cla()
+            plt.clf()
+
+    def circularSamplingMap(self, imgSize, outer, inner=0):
+        """Return a circular sampling map of size [imgSize, imgSize]
+        imgSize: image size in pixels
+        outer: outer radius (in pixels) to exclude sampling above
+        inner: inner radius (in pixels) to exclude sampling below"""
+        zeros = np.zeros((imgSize,imgSize), dtype='float')
+        ones = np.ones((imgSize,imgSize), dtype='float')
+        xpos, ypos = np.mgrid[0:imgSize,0:imgSize]
+        radius = np.sqrt((xpos - imgSize/2)**2. + (ypos - imgSize/2)**2.)
+        self.sampling = np.where((outer >= radius) & (radius >= inner), ones, zeros)
 
 def ra_to_rad(h, m, s):
     ra_h = h + (m / 60) + (s/3600)
@@ -339,9 +425,11 @@ def main():
 
     s = simvis(h_min=h_min, h_max=h_max, dec=declination, lat=latitude, freq=freq, antenna_ENU=enu_coords, point_sources=point_sources, nsteps=num_steps)
     s.plot_antennas_2D()
-    s.plot_visibilities()
+    s.plot_visibilities(True)
     s.uv_tracks()
     s.plot_uv_track()
+    s.grid()
+    s.plot_grid_real()
     pass
 
 if __name__ == "__main__":
