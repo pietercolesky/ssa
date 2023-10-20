@@ -455,9 +455,9 @@ for i in range(N):
                     fits_imag[N_x - v_cell_index - 1, u_cell_index] += point_source[0] * np.cos(2 * np.pi * (point_source[1] * uv_point[0] + point_source[2] * uv_point[1]))
                     fits_map[N_x - v_cell_index - 1, u_cell_index] = 1
 
-show_image(fits_real)
-show_image(fits_imag)
-show_image(fits_map)
+# show_image(fits_real)
+# show_image(fits_imag)
+# show_image(fits_map)
 
 plt.imshow(fits_real, cmap="jet", interpolation='nearest')
 plt.colorbar()
@@ -515,30 +515,132 @@ def circularSamplingMap(imgSize, outer, inner=0):
 sampling0 = circularSamplingMap(500, 10, 0)
 complex_visibilities = visibilities(point_sources, False)
 
-show_image(s_m)
-fft_sky = np.fft.fftshift(np.fft.fft2(s_m))
-show_image(log_scale(fft_sky.real))
-show_image(np.abs(complex_visibilities.real))
-# show_image(log_scale(np.abs(fft_sky)))
+# show_image(s_m)
+# fft_sky = np.fft.fftshift(np.fft.fft2(s_m))
+# show_image(log_scale(fft_sky.real))
+# show_image(np.abs(complex_visibilities.real))
+# # show_image(log_scale(np.abs(fft_sky)))
 
-# show_image(np.abs(np.fft.fftshift(np.fft.fft2(fits_map))))
+# # show_image(np.abs(np.fft.fftshift(np.fft.fft2(fits_map))))
 
-show_image(log_scale((fits_map * fft_sky)))
-show_image(log_scale((fits_complex)))
+# show_image(log_scale((fits_map * fft_sky)))
+# show_image(log_scale((fits_complex)))
 
-reformed_sky = np.abs(np.fft.ifft2(np.fft.fftshift(fits_map * fft_sky)))
-reformed_sky2 = np.abs(np.fft.ifft2(fits_complex))
-show_image(reformed_sky)
-show_image(reformed_sky2)
-
-reformed_sky3 = np.abs(np.fft.ifft2(np.fft.fftshift(complex_visibilities)))
-
-
-# show_image(np.abs(complex_visibilities))
-# show_image(np.angle(complex_visibilities))
+# reformed_sky = np.abs(np.fft.ifft2(np.fft.fftshift(fits_map * fft_sky)))
+# reformed_sky2 = np.abs(np.fft.ifft2(fits_complex))
+# show_image(reformed_sky)
+# show_image(reformed_sky2
+# reformed_sky3 = np.abs(np.fft.ifft2(np.fft.fftshift(complex_visibilities)))
+# show_image(reformed_sky3)
 
 
+# fftimage = np.fft.fft2(np.fft.fftshift(s_m))
+# show_image(np.angle(fftimage))
+# show_image(log_scale(np.abs(fftimage)))
+# show_image(fftimage.real)
+# show_image(fftimage.imag)
 
+
+
+def pointSourceFFT(imgSize, ypos, xpos, amp=1.):
+    img = np.zeros((imgSize+1, imgSize+1)) #odd sized array such that there is a central pixel
+    img[(int)(ypos), (int)(xpos)] = amp #make the central pixel have an intensity of 1
+    fftImg = np.fft.fft2(np.fft.fftshift(img)) #compute the Fourier transform of the image
+    
+    fig, axes = plt.subplots(figsize=(16,8))
+    plt.subplot(1,2,1)
+    plt.title('Image')
+    plt.imshow(img, interpolation='nearest')
+    plt.set_cmap('gray')
+    plt.colorbar(shrink=0.5)
+    
+    plt.subplot(1,2,2)
+    plt.title('Fourier Transform (phase)')
+    plt.imshow(np.angle(fftImg))
+    plt.set_cmap('hsv')
+    plt.colorbar(shrink=0.5)
+    plt.show()
+
+    fig, axes = plt.subplots(figsize=(16,8))
+    plt.subplot(1,2,1)
+    plt.title('Image')
+    plt.imshow(img, interpolation='nearest')
+    plt.set_cmap('gray')
+    plt.colorbar(shrink=0.5)
+    
+    plt.subplot(1,2,2)
+    plt.title('Fourier Transform (amplitude)')
+    plt.imshow(log_scale(np.abs(fftImg)))
+    plt.set_cmap('hsv')
+    plt.colorbar(shrink=0.5)
+    plt.show()
+
+    fig, axes = plt.subplots(figsize=(16,8))
+    plt.subplot(1,2,1)
+    plt.title('Image')
+    plt.imshow(img, interpolation='nearest')
+    plt.set_cmap('gray')
+    plt.colorbar(shrink=0.5)
+    
+    plt.subplot(1,2,2)
+    plt.title('Reformed')
+    plt.imshow(np.abs(np.fft.fftshift(np.fft.ifft2(fftImg))))
+    plt.set_cmap('gray')
+    plt.colorbar(shrink=0.5)
+    plt.show()
+
+def pointSourceFFT_image(img):
+    # img = np.zeros((imgSize+1, imgSize+1)) #odd sized array such that there is a central pixel
+    # img[(int)(ypos), (int)(xpos)] = amp #make the central pixel have an intensity of 1
+    fftImg = np.fft.fft2(np.fft.fftshift(img)) #compute the Fourier transform of the image
+    
+    fig, axes = plt.subplots(figsize=(16,8))
+    plt.subplot(1,2,1)
+    plt.title('Image')
+    plt.imshow(img, interpolation='nearest')
+    plt.set_cmap('gray')
+    plt.colorbar(shrink=0.5)
+    
+    plt.subplot(1,2,2)
+    plt.title('Fourier Transform (phase)')
+    plt.imshow(np.angle(fftImg))
+    plt.set_cmap('hsv')
+    plt.colorbar(shrink=0.5)
+    plt.show()
+
+    fig, axes = plt.subplots(figsize=(16,8))
+    plt.subplot(1,2,1)
+    plt.title('Image')
+    plt.imshow(img, interpolation='nearest')
+    plt.set_cmap('gray')
+    plt.colorbar(shrink=0.5)
+    
+    plt.subplot(1,2,2)
+    plt.title('Fourier Transform (amplitude)')
+    plt.imshow(log_scale(np.abs(fftImg)))
+    plt.set_cmap('hsv')
+    plt.colorbar(shrink=0.5)
+    plt.show()
+
+    fig, axes = plt.subplots(figsize=(16,8))
+    plt.subplot(1,2,1)
+    plt.title('Image')
+    plt.imshow(img, interpolation='nearest')
+    plt.set_cmap('gray')
+    plt.colorbar(shrink=0.5)
+    
+    plt.subplot(1,2,2)
+    plt.title('Reformed')
+    plt.imshow(np.abs(np.fft.fftshift(np.fft.ifft2(fftImg))))
+    plt.set_cmap('gray')
+    plt.colorbar(shrink=0.5)
+    plt.show()
+
+
+imgSize = 128
+pointSourceFFT(imgSize, (imgSize/2)+8, (imgSize/2)+8)
+
+pointSourceFFT_image(s_m)
 
 
 
