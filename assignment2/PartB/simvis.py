@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from itertools import combinations
+from pathlib import Path, PosixPath
 from typing import Dict, Any
 
 import matplotlib.pyplot as plt
@@ -7,33 +8,54 @@ import numpy as np
 import numpy.linalg as la
 import pandas as pd
 
-from read import read_config, read_enu_coords, read_sky_model_df
-from utils import to_deg
+from read import read_config, read_enu_coords, read_sky_model_df, read_img_config, input_dir
+from utils import to_deg, scale, log_scale
 
 
 @dataclass
 class SimVis:
-    sigma: float = 0.1
-    plane_size: int = 10
-    pixel_count: int = 500
-    u_range: np.ndarray = np.linspace(-4000, 4000, 500)
-    v_range: np.ndarray = np.linspace(-3000, 3000, 500)
-
+    results_dir: PosixPath = Path(__file__).parent / 'results'
     config: Dict[str, Any] = field(default_factory=lambda: read_config())
+    img_conf: Dict[str, Any] = field(default_factory=lambda: read_img_config())
     enu_coords: np.ndarray = field(default_factory=lambda: read_enu_coords())
     skymodel_df: pd.DataFrame = field(default_factory=lambda: read_sky_model_df())
 
     def __post_init__(self):
+        self.results_dir.mkdir(parents=True, exist_ok=True)
+
+        self.Nx = self.Ny = self.img_conf["num_pixels"]
         self.obs_wavelength = 299792458 / (self.config['obs_freq'] * 10 ** 9)
         self.hour_angle_range = np.linspace(self.config["hour_angle_range"][0], self.config["hour_angle_range"][1],
                                             self.config["num_steps"])
 
+        cell_size = self.img_conf["cell_size"]
+        self.u_min = -0.5 * self.Nx * cell_size
+        self.v_min = -0.5 * self.Ny * cell_size
+        self.u_max = -self.u_min
+        self.v_max = -self.v_min
+        self.u_range = np.linspace(np.floor(self.u_min), np.ceil(self.u_max), self.Nx)
+        self.v_range = np.linspace(np.floor(self.v_min), np.ceil(self.v_max), self.Ny)
+
+        self.skymodel = self._get_skymodel()
+        self.visibilities = self._get_visibilities()
+        self.baselines = self._get_baselines()
         uv = np.vstack(self.baselines["UVW"].values)[:, :2]
         self.uv = np.concatenate([uv, -uv])
+        self.scaled_uv = self._scale_uv()
 
-    @property
-    def skymodel(self):
-        lm_range = np.linspace(-self.plane_size / 2, self.plane_size / 2, self.pixel_count)
+        self.gridded_uv = np.zeros((self.Nx, self.Ny), dtype=float)
+        self.gridded_vis = np.zeros((self.Nx, self.Ny), dtype=complex)
+
+        self._grid()
+
+        self.psf = np.fft.fft2(self.gridded_uv)
+
+        obs_img = np.abs(np.fft.fftshift(np.fft.fft2(self.gridded_vis)))
+        self.obs_img = scale(obs_img, self.skymodel_df["flux"].max())
+
+    def _get_skymodel(self, sigma=0.1):
+        plane_size = self.img_conf["plane_size"]
+        lm_range = np.linspace(-plane_size / 2, plane_size / 2, self.img_conf["num_pixels"])
         l, m = np.meshgrid(lm_range, lm_range[::-1])
 
         l_deg = self.skymodel_df["l"].map(to_deg).values
@@ -42,20 +64,22 @@ class SimVis:
         flux = self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis]
         l0 = l_deg[:, np.newaxis, np.newaxis]
         m0 = m_deg[:, np.newaxis, np.newaxis]
-        return np.sum(flux * np.exp(-((l - l0) ** 2 + (m - m0) ** 2) / (2 * self.sigma ** 2)), axis=0)
+        return np.sum(flux * np.exp(-((l - l0) ** 2 + (m - m0) ** 2) / (2 * sigma ** 2)), axis=0)
 
-    @property
-    def visibilities(self):
+    def _get_visibilities(self):
         u, v = np.meshgrid(self.u_range, self.v_range[::-1])
         flux = self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis]
         l0 = self.skymodel_df['l'].values[:, np.newaxis, np.newaxis]
         m0 = self.skymodel_df['m'].values[:, np.newaxis, np.newaxis]
         return np.sum(flux * np.exp(-2 * np.pi * (l0 * u + m0 * v) * 1j), axis=0)
 
-    @property
-    def baselines(self):
-        baselines = list(combinations(self.enu_coords, 2))
-        baselines_df = pd.DataFrame(baselines, columns=["X1", "X2"])
+    def _get_baselines(self):
+        baselines = list(combinations(enumerate(self.enu_coords, 1), 2))
+        baselines_df = pd.DataFrame(baselines, columns=["Antenna1", "Antenna2"])
+        baselines_df["Name"] = baselines_df.apply(lambda row: f'{row["Antenna1"][0]}_{row["Antenna2"][0]}', axis=1)
+        baselines_df["X1"] = baselines_df["Antenna1"].apply(lambda x: x[1])
+        baselines_df["X2"] = baselines_df["Antenna2"].apply(lambda x: x[1])
+        baselines_df.drop(["Antenna1", "Antenna2"], axis=1, inplace=True)
         baselines_df["b"] = baselines_df["X2"] - baselines_df["X1"]
         baselines_df["D"] = baselines_df["b"].map(la.norm)
         baselines_df["A"] = baselines_df["b"].map(lambda b: np.arctan(b[0] / b[1]))
@@ -67,6 +91,16 @@ class SimVis:
             lambda xyz: self._get_uvw(xyz)
         )
         return baselines_df
+
+    def _scale_uv(self):
+        scaled_uv = np.copy(self.uv)
+        max_u = np.max(np.abs(self.uv[:, 0]))
+        max_v = np.max(np.abs(self.uv[:, 1]))
+        scaled_uv[:, 0] /= (2 * max_u / self.Nx)
+        scaled_uv[:, 1] /= (2 * max_v / self.Ny)
+        scaled_uv[:, 0] += self.Nx / 2
+        scaled_uv[:, 1] += self.Ny / 2
+        return scaled_uv
 
     def _get_xyz(self, baseline):
         L = self.config["lat"]
@@ -87,42 +121,44 @@ class SimVis:
             ]).dot(xyz) / self.obs_wavelength, self.hour_angle_range
         ))
 
-    def _search(self, coords, col, min_val, max_val):
-        uv_sorted = coords[coords[:, col].argsort()]
-        start_idx = np.searchsorted(uv_sorted[:, col], min_val, side='left')
-        end_idx = np.searchsorted(uv_sorted[:, col], max_val, side='right')
-        return uv_sorted[start_idx:end_idx]
+    def _grid(self):
+        sources = self.skymodel_df[["flux", "l", "m"]].values
+        for i, uv_point in enumerate(self.scaled_uv):
+            u = int(uv_point[0])
+            v = int(uv_point[1])
+            if 0 <= u < self.Nx and 0 <= v < self.Ny:
+                self.gridded_uv[v, u] = 1
+                flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
+                self.gridded_vis[v, u] += np.sum(flux * np.exp(-2 * np.pi * 1j * (l * self.uv[i][0] + m * self.uv[i][1])))
 
     def plot_sky_model(self):
-        plt.imshow(self.skymodel, extent=(-self.plane_size / 2, self.plane_size / 2, -self.plane_size / 2,
-                                          self.plane_size / 2), cmap='jet')
+        size = self.img_conf["plane_size"] / 2
+        plt.imshow(self.skymodel, extent=(-size, size, -size, size), cmap='jet')
         plt.colorbar(label='Brightness')
         plt.xlabel(r'l ($^{\circ}$)')
         plt.ylabel(r'm ($^{\circ}$)')
         plt.title('Skymodel (in brightness)')
-        plt.show()
+        plt.savefig(self.results_dir / "skymodel.png")
 
     def plot_visibilities(self):
-        u_min, u_max, v_min, v_max = self.u_range.min(), self.u_range.max(), self.v_range.min(), self.v_range.max()
+        u_min = np.floor(self.u_min)
+        v_min = np.floor(self.v_min)
+        u_max = np.ceil(self.u_max)
+        v_max = np.ceil(self.v_max)
 
-        fig, axes = plt.subplots(1, 2, figsize=(20, 6))
+        plt.imshow(log_scale(self.visibilities.real), extent=(u_min, u_max, v_min, v_max), cmap="jet")
+        plt.xlabel(r"u (rad$^{-1})$")
+        plt.ylabel(r"v (rad$^{-1})$")
+        plt.title('Visibilities (Amplitude)')
+        plt.colorbar(label="Magnitude", orientation='vertical')
+        plt.close()
 
-        im1 = axes[0].imshow(self.visibilities.real, extent=(u_min, u_max, v_min, v_max), cmap="jet")
-        axes[0].set_xlabel(r"u (rad$^{-1})$")
-        axes[0].set_ylabel(r"v (rad$^{-1})$")
-        axes[0].set_title('Real part of Visibilities')
-        cbar = fig.colorbar(im1, ax=axes[0], orientation='vertical')
-        cbar.set_label('Magnitude')
-
-        im2 = axes[1].imshow(self.visibilities.imag, extent=(u_min, u_max, v_min, v_max), cmap='jet')
-        axes[1].set_xlabel(r"u (rad$^{-1})$")
-        axes[1].set_ylabel(r"v (rad$^{-1})$")
-        axes[1].set_title('Imaginary part of Visibilities')
-        cbar = fig.colorbar(im2, ax=axes[1], orientation='vertical')
-        cbar.set_label('Magnitude')
-
-        plt.tight_layout()
-        plt.show()
+        plt.imshow(scale(np.angle(self.visibilities.imag)), extent=(u_min, u_max, v_min, v_max), cmap='jet')
+        plt.xlabel(r"u (rad$^{-1})$")
+        plt.ylabel(r"v (rad$^{-1})$")
+        plt.title('Visibilities (Phase)')
+        plt.colorbar(label="Magnitude", orientation='vertical')
+        plt.close()
 
     def plot_antennas_2D(self):
         E = self.enu_coords[:, 0]
@@ -131,9 +167,15 @@ class SimVis:
         max_E = np.max(np.abs(E))
         max_N = np.max(np.abs(N))
 
+        marker = plt.imread(input_dir / 'telescope.png')
+        marker_size = 10
+
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        ax.scatter(E, N)
+
+        for i in range(len(E)):
+            ax.imshow(marker, extent=[E[i] - marker_size / 2, E[i] + marker_size / 2, N[i] - marker_size / 2,
+                                      N[i] + marker_size / 2])
 
         ax.set_xlabel("W-E (m)")
         ax.set_ylabel("S-N (m)")
@@ -141,68 +183,109 @@ class SimVis:
         ax.set_xlim([-max_E - (1 / 3) * max_E, max_E + (1 / 3) * max_E])
         ax.set_ylim([-max_N - (1 / 3) * max_N, max_N + (1 / 3) * max_N])
 
-        plt.show()
+        plt.savefig(self.results_dir / "antennae.png")
+        plt.close()
 
     def plot_uv(self):
         mid = len(self.uv) // 2
         plt.scatter(self.uv[:mid, 0], self.uv[:mid, 1], s=2, c="b", label="Baselines")
         plt.scatter(self.uv[mid:, 0], self.uv[mid:, 1], s=2, c="r", label="Conjugate Baselines")
-
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('uv-tracks')
         plt.legend(["Baselines", "Conjugate Baselines"])
-        plt.show()
+        plt.savefig(self.results_dir / "uv-coverage.png")
+        plt.close()
+
+    def plot_sampled_visibilities(self):
+        plt.title("Sampling of the visibility space (amplitude)")
+        plt.imshow(log_scale(self.visibilities.real), cmap="jet")
+        plt.plot(self.scaled_uv[:, 0], self.scaled_uv[:, 1], "k.", label="Baselines")
+        plt.colorbar(label="Magnitude", orientation='vertical')
+        plt.savefig(self.results_dir / "sampled_vis_amp.png")
+        plt.close()
+
+        plt.title("Sampling of the visibility space (phase)")
+        plt.imshow(scale(np.angle(self.visibilities.imag)), cmap="jet")
+        plt.plot(self.scaled_uv[:, 0], self.scaled_uv[:, 1], "k.", label="Baselines")
+        plt.colorbar(label="Magnitude", orientation='vertical')
+        plt.savefig(self.results_dir / "sampled_vis_phase.png")
+        plt.close()
+
+    def plot_psf(self):
+        size = self.img_conf["plane_size"] / 2
+        plt.imshow(log_scale(np.fft.fftshift(self.psf)), extent=(-size, size, -size, size))
+        plt.xlabel(r"l ($^{\circ})$")
+        plt.ylabel(r"m ($^{\circ})$")
+        plt.title('PSF')
+        plt.colorbar()
+        plt.savefig(self.results_dir / "psf.png")
+        plt.close()
+
+    def plot_gridded_visibilities(self):
+        u_min = np.floor(self.u_min)
+        v_min = np.floor(self.v_min)
+        u_max = np.ceil(self.u_max)
+        v_max = np.ceil(self.v_max)
+
+        plt.imshow(log_scale(self.gridded_vis.real), extent=(u_min, u_max, v_min, v_max), cmap="jet")
+        plt.xlabel(r"u (rad$^{-1})$")
+        plt.ylabel(r"v (rad$^{-1})$")
+        plt.title('Gridded Visibilities (Amplitude)')
+        plt.colorbar(label="Magnitude", orientation='vertical')
+        plt.savefig(self.results_dir / "gridded_amp.png")
+        plt.close()
+
+        plt.imshow(scale(np.angle(self.gridded_vis.imag)), extent=(u_min, u_max, v_min, v_max), cmap="jet")
+        plt.xlabel(r"u (rad$^{-1})$")
+        plt.ylabel(r"v (rad$^{-1})$")
+        plt.title('Gridded Visibilities (Phase)')
+        plt.colorbar(label="Magnitude", orientation='vertical')
+        plt.savefig(self.results_dir / "gridded_phase.png")
+        plt.close()
+
+    def plot_observed_image(self):
+        size = self.img_conf["plane_size"] / 2
+        plt.imshow(self.obs_img, cmap="jet", extent=(-size, size, -size, size))
+        plt.xlabel(r"l ($^{\circ})$")
+        plt.ylabel(r"m ($^{\circ})$")
+        plt.title('Observed Image')
+        plt.colorbar()
+        plt.savefig(self.results_dir / "image.png")
+        plt.close()
 
 
 if __name__ == "__main__":
     simvis = SimVis()
 
     print("Baselines:")
-    print(simvis.baselines.b)
+    print(simvis.baselines[["Name", "b"]])
 
     print()
     print("Distance:")
-    print(simvis.baselines.D)
+    print(simvis.baselines[["Name", "D"]])
 
     print()
     print("Azimuth:")
-    print(simvis.baselines.A)
+    print(simvis.baselines[["Name", "A"]])
 
     print()
     print("Elevation:")
-    print(simvis.baselines.E)
+    print(simvis.baselines[["Name", "E"]])
 
     print()
     print("XYZ:")
-    print(simvis.baselines.XYZ)
+    print(simvis.baselines[["Name", "XYZ"]])
 
     print()
     print("UV:")
-    print(simvis.uv.shape)
     print(simvis.uv)
-
-    # Get uv-coords with u in range [0, 1)
-    pts = simvis._search(simvis.uv, 0, 0, 1)
-    print()
-    print("BINARY SEARCH")
-    print(pts.shape)
-    if len(pts) > 0:
-        print(f"u min: {pts[:, 0].min()}")
-        print(f"u max: {pts[:, 0].max()}")
-        print(f"v min: {pts[:, 1].min()}")
-        print(f"v max: {pts[:, 1].max()}")
-
-        # Get uv-coords of the points above with v in range [-416, -415)
-        filtered = simvis._search(pts, 1, -416, -415)
-        print(filtered.shape)
-        if len(filtered) > 0:
-            print(f"u min: {filtered[:, 0].min()}")
-            print(f"u max: {filtered[:, 0].max()}")
-            print(f"v min: {filtered[:, 1].min()}")
-            print(f"v max: {filtered[:, 1].max()}")
 
     simvis.plot_antennas_2D()
     simvis.plot_sky_model()
     simvis.plot_visibilities()
     simvis.plot_uv()
+    simvis.plot_sampled_visibilities()
+    simvis.plot_psf()
+    simvis.plot_gridded_visibilities()
+    simvis.plot_observed_image()

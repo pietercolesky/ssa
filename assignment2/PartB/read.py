@@ -52,8 +52,5 @@ def read_sky_model_df():
 def read_img_config():
     with open(input_dir / 'image.json', "rb") as file:
         config = load(file)
-    config["extent"]["l"] = list(map(deg_to_rad, config["extent"]["l"]))
-    config["extent"]["m"] = list(map(deg_to_rad, config["extent"]["m"]))
-    config["resolution"]["l"] = deg_to_rad(*config["resolution"]["l"])
-    config["resolution"]["m"] = deg_to_rad(*config["resolution"]["m"])
     return config
+

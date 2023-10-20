@@ -1,11 +1,5 @@
 {
-  "extent": {
-    "l": [-4, 4],
-    "m": [-4, 4]
-  },
-  "resolution": {
-    "l": [0, 0, 5],
-    "m": [0, 0, 5]
-  },
-  "k": 3
+  "cell_size": 3,
+  "plane_size": 8,
+  "num_pixels": 500
 }
