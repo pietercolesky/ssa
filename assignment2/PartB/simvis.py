@@ -146,14 +146,14 @@ class SimVis:
         u_max = np.ceil(self.u_max)
         v_max = np.ceil(self.v_max)
 
-        plt.imshow(log_scale(self.visibilities.real), extent=(u_min, u_max, v_min, v_max), cmap="jet")
+        plt.imshow(log_scale(self.visibilities), extent=(u_min, u_max, v_min, v_max), cmap="jet")
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('Visibilities (Amplitude)')
         plt.colorbar(label="Magnitude", orientation='vertical')
         plt.close()
 
-        plt.imshow(scale(np.angle(self.visibilities.imag)), extent=(u_min, u_max, v_min, v_max), cmap='jet')
+        plt.imshow(np.angle(self.visibilities), extent=(u_min, u_max, v_min, v_max), cmap='jet')
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('Visibilities (Phase)')
@@ -199,14 +199,14 @@ class SimVis:
 
     def plot_sampled_visibilities(self):
         plt.title("Sampling of the visibility space (amplitude)")
-        plt.imshow(log_scale(self.visibilities.real), cmap="jet")
+        plt.imshow(log_scale(self.visibilities), cmap="jet")
         plt.plot(self.scaled_uv[:, 0], self.scaled_uv[:, 1], "k.", label="Baselines")
         plt.colorbar(label="Magnitude", orientation='vertical')
         plt.savefig(self.results_dir / "sampled_vis_amp.png")
         plt.close()
 
         plt.title("Sampling of the visibility space (phase)")
-        plt.imshow(scale(np.angle(self.visibilities.imag)), cmap="jet")
+        plt.imshow(np.angle(self.visibilities), cmap="jet")
         plt.plot(self.scaled_uv[:, 0], self.scaled_uv[:, 1], "k.", label="Baselines")
         plt.colorbar(label="Magnitude", orientation='vertical')
         plt.savefig(self.results_dir / "sampled_vis_phase.png")
@@ -228,7 +228,7 @@ class SimVis:
         u_max = np.ceil(self.u_max)
         v_max = np.ceil(self.v_max)
 
-        plt.imshow(log_scale(self.gridded_vis.real), extent=(u_min, u_max, v_min, v_max), cmap="jet")
+        plt.imshow(log_scale(self.gridded_vis), extent=(u_min, u_max, v_min, v_max), cmap="jet")
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('Gridded Visibilities (Amplitude)')
@@ -236,7 +236,7 @@ class SimVis:
         plt.savefig(self.results_dir / "gridded_amp.png")
         plt.close()
 
-        plt.imshow(scale(np.angle(self.gridded_vis.imag)), extent=(u_min, u_max, v_min, v_max), cmap="jet")
+        plt.imshow(np.angle(self.gridded_vis), extent=(u_min, u_max, v_min, v_max), cmap="jet")
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('Gridded Visibilities (Phase)')
