@@ -37,7 +37,6 @@ class SimVis:
         self.v_range = np.linspace(np.floor(self.v_min), np.ceil(self.v_max), self.Ny)
 
         self.skymodel = self._get_skymodel()
-        self.visibilities = self._get_visibilities()
         self.baselines = self._get_baselines()
         uv = np.vstack(self.baselines["UVW"].values)[:, :2]
         self.uv = np.concatenate([uv, -uv])
@@ -66,8 +65,8 @@ class SimVis:
         m0 = m_deg[:, np.newaxis, np.newaxis]
         return np.sum(flux * np.exp(-((l - l0) ** 2 + (m - m0) ** 2) / (2 * sigma ** 2)), axis=0)
 
-    def _get_visibilities(self):
-        u, v = np.meshgrid(self.u_range, self.v_range[::-1])
+    def _get_visibilities(self, u_range, v_range):
+        u, v = np.meshgrid(u_range, v_range[::-1])
         flux = self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis]
         l0 = self.skymodel_df['l'].values[:, np.newaxis, np.newaxis]
         m0 = self.skymodel_df['m'].values[:, np.newaxis, np.newaxis]
@@ -139,25 +138,6 @@ class SimVis:
         plt.ylabel(r'm ($^{\circ}$)')
         plt.title('Skymodel (in brightness)')
         plt.savefig(self.results_dir / "skymodel.png")
-
-    def plot_visibilities(self):
-        u_min = np.floor(self.u_min)
-        v_min = np.floor(self.v_min)
-        u_max = np.ceil(self.u_max)
-        v_max = np.ceil(self.v_max)
-
-        plt.imshow(log_scale(self.visibilities), extent=(u_min, u_max, v_min, v_max), cmap="jet")
-        plt.xlabel(r"u (rad$^{-1})$")
-        plt.ylabel(r"v (rad$^{-1})$")
-        plt.title('Visibilities (Amplitude)')
-        plt.colorbar(label="Magnitude", orientation='vertical')
-        plt.close()
-
-        plt.imshow(np.angle(self.visibilities), extent=(u_min, u_max, v_min, v_max), cmap='jet')
-        plt.xlabel(r"u (rad$^{-1})$")
-        plt.ylabel(r"v (rad$^{-1})$")
-        plt.title('Visibilities (Phase)')
-        plt.colorbar(label="Magnitude", orientation='vertical')
         plt.close()
 
     def plot_antennas_2D(self):
@@ -195,21 +175,6 @@ class SimVis:
         plt.title('uv-tracks')
         plt.legend(["Baselines", "Conjugate Baselines"])
         plt.savefig(self.results_dir / "uv-coverage.png")
-        plt.close()
-
-    def plot_sampled_visibilities(self):
-        plt.title("Sampling of the visibility space (amplitude)")
-        plt.imshow(log_scale(self.visibilities), cmap="jet")
-        plt.plot(self.scaled_uv[:, 0], self.scaled_uv[:, 1], "k.", label="Baselines")
-        plt.colorbar(label="Magnitude", orientation='vertical')
-        plt.savefig(self.results_dir / "sampled_vis_amp.png")
-        plt.close()
-
-        plt.title("Sampling of the visibility space (phase)")
-        plt.imshow(np.angle(self.visibilities), cmap="jet")
-        plt.plot(self.scaled_uv[:, 0], self.scaled_uv[:, 1], "k.", label="Baselines")
-        plt.colorbar(label="Magnitude", orientation='vertical')
-        plt.savefig(self.results_dir / "sampled_vis_phase.png")
         plt.close()
 
     def plot_psf(self):
@@ -254,6 +219,39 @@ class SimVis:
         plt.savefig(self.results_dir / "image.png")
         plt.close()
 
+    def plot_visibilities(self):
+        baselines = self.img_conf["baselines"]
+        baseline_uvs = np.stack(self.baselines[self.baselines.Name.isin(baselines)]["UVW"].values)[:, :, :2]
+        for baseline, uv in zip(baselines, baseline_uvs):
+            u_range = np.sort(uv[:, 0])
+            v_range = np.sort(uv[:, 1])
+            visibilities = self._get_visibilities(u_range, v_range)
+
+            u_min = np.floor(u_range[0])
+            v_min = np.floor(v_range[0])
+            u_max = np.ceil(u_range[-1])
+            v_max = np.ceil(v_range[-1])
+
+            plt.figure(figsize=(4, 6))
+            plt.imshow(log_scale(visibilities), extent=(u_min, u_max, v_min, v_max), cmap="jet")
+            plt.xlabel(r"u (rad$^{-1})$")
+            plt.ylabel(r"v (rad$^{-1})$")
+            plt.title(f'Baseline {baseline} Visibilities (Amplitude)')
+            plt.colorbar(label="Magnitude", orientation='vertical')
+            plt.tight_layout()
+            plt.savefig(self.results_dir / f"vis_b_{baseline}_amp.png")
+            plt.close()
+
+            plt.figure(figsize=(4, 6))
+            plt.imshow(np.angle(visibilities), extent=(u_min, u_max, v_min, v_max), cmap='jet')
+            plt.xlabel(r"u (rad$^{-1})$")
+            plt.ylabel(r"v (rad$^{-1})$")
+            plt.title(f'Baseline {baseline} Visibilities (Phase)')
+            plt.colorbar(label="Magnitude", orientation='vertical')
+            plt.tight_layout()
+            plt.savefig(self.results_dir / f"vis_b_{baseline}_phase.png")
+            plt.close()
+
 
 if __name__ == "__main__":
     simvis = SimVis()
@@ -283,9 +281,8 @@ if __name__ == "__main__":
 
     simvis.plot_antennas_2D()
     simvis.plot_sky_model()
-    simvis.plot_visibilities()
     simvis.plot_uv()
-    simvis.plot_sampled_visibilities()
+    simvis.plot_visibilities()
     simvis.plot_psf()
     simvis.plot_gridded_visibilities()
     simvis.plot_observed_image()
