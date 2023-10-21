@@ -47,7 +47,7 @@ class SimVis:
 
         self.psf = np.fft.fftshift(np.fft.fft2(self.gridded_uv))
 
-        obs_img = np.abs(np.fft.fftshift(np.fft.fft2(self.gridded_vis)))
+        obs_img = np.abs(np.fft.fftshift(np.fft.ifft2(self.gridded_vis)))
         self.obs_img = scale(obs_img, self.skymodel_df["flux"].max())
 
     def _get_skymodel(self, sigma=0.1):
@@ -122,9 +122,9 @@ class SimVis:
             u = uv_point[0]
             v = uv_point[1]
             if 0 <= u < self.Nx and 0 <= v < self.Ny:
-                self.gridded_uv[v, -u] = 1
+                self.gridded_uv[-v, u] = 1
                 flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
-                self.gridded_vis[v, -u] += np.sum(
+                self.gridded_vis[-v, u] += np.sum(
                     flux * np.exp(-2 * np.pi * 1j * (l * self.uv[i][0] + m * self.uv[i][1]))
                 )
 
