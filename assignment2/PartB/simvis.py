@@ -267,9 +267,14 @@ class SimVis:
 if __name__ == "__main__":
     simvis = SimVis()
 
-    print("Baselines:")
+    print("Skymodel:")
+    print(simvis.skymodel_df.to_string())
+
+    print("\nENU Coordinates:")
+    print(simvis.enu_coords)
+
+    print("\nBaselines:")
     print(simvis.baselines[["name", "A1", "A2"]].to_string())
-    print()
     print(simvis.baselines[["name", "b",  "D", "A", "E", "XYZ"]].to_string())
 
     print("\nUV:")
