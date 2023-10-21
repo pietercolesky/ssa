@@ -129,14 +129,12 @@ class SimVis:
                 )
 
     def _get_baseline_uv(self, name):
-        baselines = self.baselines.name.values
-        conj_baselines = self.baselines.conj_name.values
-        if name in baselines:
-            return np.stack(self.baselines[self.baselines.name == name]["UVW"].values)[0, :, :2]
-        elif name in conj_baselines:
-            return -np.stack(self.baselines[self.baselines.conj_name == name]["UVW"].values)[0, :, :2]
-        else:
+        baselines = np.concatenate([self.baselines.name.values, self.baselines.conj_name.values])
+        if name not in baselines:
             return []
+        return np.stack(
+            self.baselines[(self.baselines.name == name) | (self.baselines.conj_name == name)]["UVW"].values
+        )[0, :, :2]
 
     def plot_sky_model(self):
         size = self.img_conf["plane_size"] / 2
