@@ -33,8 +33,6 @@ class SimVis:
         self.v_min = -0.5 * self.Ny * cell_size
         self.u_max = -self.u_min
         self.v_max = -self.v_min
-        self.u_range = np.linspace(np.floor(self.u_min), np.ceil(self.u_max), self.Nx)
-        self.v_range = np.linspace(np.floor(self.v_min), np.ceil(self.v_max), self.Ny)
 
         self.skymodel = self._get_skymodel()
         self.baselines = self._get_baselines()
@@ -93,10 +91,8 @@ class SimVis:
 
     def _scale_uv(self):
         scaled_uv = np.copy(self.uv)
-        max_u = np.max(np.abs(self.uv[:, 0]))
-        max_v = np.max(np.abs(self.uv[:, 1]))
-        scaled_uv[:, 0] /= (2 * max_u / self.Nx)
-        scaled_uv[:, 1] /= (2 * max_v / self.Ny)
+        scaled_uv[:, 0] /= (2 * self.u_max / self.Nx)
+        scaled_uv[:, 1] /= (2 * self.v_max / self.Ny)
         scaled_uv[:, 0] += self.Nx / 2
         scaled_uv[:, 1] += self.Ny / 2
         return scaled_uv
