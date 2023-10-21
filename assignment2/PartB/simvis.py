@@ -72,12 +72,12 @@ class SimVis:
 
     def _get_baselines(self):
         baselines = list(combinations(enumerate(self.enu_coords, 1), 2))
-        baselines_df = pd.DataFrame(baselines, columns=["Antenna1", "Antenna2"])
-        baselines_df["Name"] = baselines_df.apply(lambda row: f'{row["Antenna1"][0]}_{row["Antenna2"][0]}', axis=1)
-        baselines_df["X1"] = baselines_df["Antenna1"].apply(lambda x: x[1])
-        baselines_df["X2"] = baselines_df["Antenna2"].apply(lambda x: x[1])
-        baselines_df.drop(["Antenna1", "Antenna2"], axis=1, inplace=True)
-        baselines_df["b"] = baselines_df["X2"] - baselines_df["X1"]
+        baselines_df = pd.DataFrame(baselines, columns=["A1", "A2"])
+        baselines_df["name"] = baselines_df.apply(lambda row: f'{row["A1"][0]}_{row["A2"][0]}', axis=1)
+        baselines_df["conj_name"] = baselines_df.name.map(lambda name: '_'.join(reversed(name.split('_'))))
+        baselines_df["A1"] = baselines_df["A1"].apply(lambda x: x[1])
+        baselines_df["A2"] = baselines_df["A2"].apply(lambda x: x[1])
+        baselines_df["b"] = baselines_df["A2"] - baselines_df["A1"]
         baselines_df["D"] = baselines_df["b"].map(la.norm)
         baselines_df["A"] = baselines_df["b"].map(lambda b: np.arctan(b[0] / b[1]))
         baselines_df["E"] = baselines_df["b"].map(lambda b: np.arctan(b[2] / la.norm(b[:2])))
@@ -127,6 +127,16 @@ class SimVis:
                 self.gridded_vis[v, -u] += np.sum(
                     flux * np.exp(-2 * np.pi * 1j * (l * self.uv[i][0] + m * self.uv[i][1]))
                 )
+
+    def _get_baseline_uv(self, name):
+        baselines = self.baselines.name.values
+        conj_baselines = self.baselines.conj_name.values
+        if name in baselines:
+            return np.stack(self.baselines[self.baselines.name == name]["UVW"].values)[0, :, :2]
+        elif name in conj_baselines:
+            return -np.stack(self.baselines[self.baselines.conj_name == name]["UVW"].values)[0, :, :2]
+        else:
+            return []
 
     def plot_sky_model(self):
         size = self.img_conf["plane_size"] / 2
@@ -220,8 +230,12 @@ class SimVis:
 
     def plot_visibilities(self):
         baselines = self.img_conf["baselines"]
-        baseline_uvs = np.stack(self.baselines[self.baselines.Name.isin(baselines)]["UVW"].values)[:, :, :2]
-        for baseline, uv in zip(baselines, baseline_uvs):
+        for baseline in baselines:
+            uv = self._get_baseline_uv(baseline)
+            if len(uv) == 0:
+                print(f"Baseline {baseline} not found!")
+                continue
+
             u_range = np.sort(uv[:, 0])
             v_range = np.sort(uv[:, 1])
             visibilities = self._get_visibilities(u_range, v_range)
@@ -256,23 +270,23 @@ if __name__ == "__main__":
     simvis = SimVis()
 
     print("Baselines:")
-    print(simvis.baselines[["Name", "b"]])
+    print(simvis.baselines[["name", "b"]])
 
     print()
     print("Distance:")
-    print(simvis.baselines[["Name", "D"]])
+    print(simvis.baselines[["name", "D"]])
 
     print()
     print("Azimuth:")
-    print(simvis.baselines[["Name", "A"]])
+    print(simvis.baselines[["name", "A"]])
 
     print()
     print("Elevation:")
-    print(simvis.baselines[["Name", "E"]])
+    print(simvis.baselines[["name", "E"]])
 
     print()
     print("XYZ:")
-    print(simvis.baselines[["Name", "XYZ"]])
+    print(simvis.baselines[["name", "XYZ"]])
 
     print()
     print("UV:")
