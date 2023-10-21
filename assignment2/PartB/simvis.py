@@ -164,6 +164,7 @@ class SimVis:
 
     def plot_uv(self):
         mid = len(self.uv) // 2
+        plt.figure(figsize=(6, 5))
         plt.scatter(self.uv[:mid, 0], self.uv[:mid, 1], s=2, c="b", label="Baselines")
         plt.scatter(self.uv[mid:, 0], self.uv[mid:, 1], s=2, c="r", label="Conjugate Baselines")
         plt.xlabel(r"u (rad$^{-1})$")
