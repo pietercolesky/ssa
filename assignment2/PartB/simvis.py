@@ -268,7 +268,9 @@ if __name__ == "__main__":
     simvis = SimVis()
 
     print("Baselines:")
-    print(simvis.baselines[["name", "A1", "A2", "b",  "D", "A", "E", "XYZ"]].to_string())
+    print(simvis.baselines[["name", "A1", "A2"]].to_string())
+    print()
+    print(simvis.baselines[["name", "b",  "D", "A", "E", "XYZ"]].to_string())
 
     print("\nUV:")
     print(simvis.uv)
