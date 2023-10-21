@@ -268,26 +268,9 @@ if __name__ == "__main__":
     simvis = SimVis()
 
     print("Baselines:")
-    print(simvis.baselines[["name", "b"]])
+    print(simvis.baselines[["name", "b",  "D", "A", "E", "XYZ"]].to_string())
 
-    print()
-    print("Distance:")
-    print(simvis.baselines[["name", "D"]])
-
-    print()
-    print("Azimuth:")
-    print(simvis.baselines[["name", "A"]])
-
-    print()
-    print("Elevation:")
-    print(simvis.baselines[["name", "E"]])
-
-    print()
-    print("XYZ:")
-    print(simvis.baselines[["name", "XYZ"]])
-
-    print()
-    print("UV:")
+    print("\nUV:")
     print(simvis.uv)
 
     simvis.plot_antennas_2D()
