@@ -95,7 +95,7 @@ class SimVis:
         scaled_uv[:, 1] /= (2 * self.v_max / self.Ny)
         scaled_uv[:, 0] += self.Nx / 2
         scaled_uv[:, 1] += self.Ny / 2
-        return scaled_uv
+        return np.round(scaled_uv).astype(int)
 
     def _get_xyz(self, baseline):
         L = self.config["lat"]
@@ -119,11 +119,14 @@ class SimVis:
     def _grid(self):
         sources = self.skymodel_df[["flux", "l", "m"]].values
         for i, uv_point in enumerate(self.scaled_uv):
-            u = int(uv_point[0])
-            v = int(uv_point[1])
-            self.gridded_uv[v, u] = 1
-            flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
-            self.gridded_vis[v, u] += np.sum(flux * np.exp(-2 * np.pi * 1j * (l * self.uv[i][0] + m * self.uv[i][1])))
+            u = uv_point[0]
+            v = uv_point[1]
+            if 0 <= u < self.Nx and 0 <= v < self.Ny:
+                self.gridded_uv[v, -u] = 1
+                flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
+                self.gridded_vis[v, -u] += np.sum(
+                    flux * np.exp(-2 * np.pi * 1j * (l * self.uv[i][0] + m * self.uv[i][1]))
+                )
 
     def plot_sky_model(self):
         size = self.img_conf["plane_size"] / 2
