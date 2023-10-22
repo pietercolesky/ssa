@@ -9,12 +9,16 @@ def to_deg(x):
     return x * (180 / np.pi)
 
 
-def deg_to_rad(degrees, arcmin=0, arcsecs=0):
-    return to_rad(degrees + (arcmin / 60) + (arcsecs / 3600))
+def deg_to_rad(degrees, arcmin, arcsecs):
+    return to_rad(total(degrees, arcmin, arcsecs))
 
 
-def hours_to_rad(hours, mins=0, secs=0):
-    return (np.pi / 12) * (hours + (mins / 60) + (secs / 3600))
+def hours_to_rad(hours, mins, secs):
+    return (np.pi / 12) * total(hours, mins, secs)
+
+
+def total(a, b, c):
+    return a + (b / 60) + (c / 3600)
 
 
 def scale(x, max_val=255):

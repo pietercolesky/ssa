@@ -3,6 +3,6 @@
   "obs_freq": 1.4,
   "dec": [-74, -39, -37.481],
   "ra": [-4, -44, -6.686],
-  "hour_angle_range": [-4, 4],
+  "hour_angle_range": [[-4, 0, 0], [4, 0, 0]],
   "num_steps": 600
 }

@@ -4,8 +4,7 @@ from json import load
 import numpy as np
 from pandas import read_csv
 
-from utils import deg_to_rad, hours_to_rad
-
+from utils import deg_to_rad, hours_to_rad, total
 
 input_dir = Path(__file__).parent / 'input'
 
@@ -32,7 +31,7 @@ def read_config():
     config['lat'] = deg_to_rad(*config['lat'])
     config['ra'] = hours_to_rad(*config['ra'])
     config['dec'] = deg_to_rad(*config['dec'])
-    config['hour_angle_range'] = list(map(hours_to_rad, config['hour_angle_range']))
+    config['hour_angle_range'] = list(map(lambda h: hours_to_rad(*h), config['hour_angle_range']))
     return config
 
 
@@ -52,5 +51,7 @@ def read_sky_model_df():
 def read_img_config():
     with open(input_dir / 'image.json', "rb") as file:
         config = load(file)
+    config["cell_size"] = total(*config["cell_size"]) * 3600
+    config["plane_size"] = total(*config["plane_size"])
     return config
 
