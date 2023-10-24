@@ -1,10 +1,10 @@
-from pathlib import Path
 from json import load
+from pathlib import Path
 
 import numpy as np
 from pandas import read_csv
 
-from utils import deg_to_rad, hours_to_rad, total
+from utils import deg_to_rad, hours_to_rad
 
 input_dir = Path(__file__).parent / 'input'
 
