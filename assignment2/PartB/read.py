@@ -51,7 +51,6 @@ def read_sky_model_df():
 def read_img_config():
     with open(input_dir / 'image.json', "rb") as file:
         config = load(file)
-    config["cell_size"] = total(*config["cell_size"]) * 3600
-    config["plane_size"] = total(*config["plane_size"])
+    config["cell_size"] = deg_to_rad(*config["cell_size"])
     return config
 

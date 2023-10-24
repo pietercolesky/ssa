@@ -9,7 +9,7 @@ import numpy.linalg as la
 import pandas as pd
 
 from read import read_config, read_enu_coords, read_sky_model_df, read_img_config, input_dir
-from utils import to_deg, scale, log_scale, deg_to_rad, to_rad
+from utils import to_deg, scale, log_scale, deg_to_rad, to_rad, total
 
 
 @dataclass
@@ -29,8 +29,14 @@ class SimVis:
 
         cell_size = self.img_conf["cell_size"]
         self.Nx = self.Ny = self.img_conf["num_pixels"]
-        self.u_min = -0.5 * self.Nx * cell_size
-        self.v_min = -0.5 * self.Ny * cell_size
+
+        self.l_min = to_deg(-0.5 * self.Nx * cell_size)
+        self.m_min = to_deg(-0.5 * self.Ny * cell_size)
+        self.l_max = -self.l_min
+        self.m_max = -self.m_min
+
+        self.u_min = -0.5 * self.Nx * (1 / (self.Nx * cell_size))
+        self.v_min = -0.5 * self.Ny * (1 / (self.Ny * cell_size))
         self.u_max = -self.u_min
         self.v_max = -self.v_min
 
@@ -39,7 +45,6 @@ class SimVis:
         uv = np.vstack(self.baselines["UVW"].values)[:, :2]
         self.uv = np.concatenate([uv, -uv])
         self.scaled_uv = self._scale_uv()
-
         self.gridded_uv = np.zeros((self.Nx, self.Ny), dtype=float)
         self.gridded_vis = np.zeros((self.Nx, self.Ny), dtype=complex)
 
@@ -51,9 +56,9 @@ class SimVis:
         self.obs_img = scale(obs_img, self.skymodel_df["flux"].max())
 
     def _get_skymodel(self, sigma=0.1):
-        plane_size = self.img_conf["plane_size"]
-        lm_range = np.linspace(-plane_size / 2, plane_size / 2, self.img_conf["num_pixels"])
-        l, m = np.meshgrid(lm_range, lm_range[::-1])
+        l_range = np.linspace(self.l_min, self.l_max, self.img_conf["num_pixels"])
+        m_range = np.linspace(self.m_min, self.m_max, self.img_conf["num_pixels"])
+        l, m = np.meshgrid(l_range, m_range[::-1])
 
         l_deg = self.skymodel_df["l"].map(to_deg).values
         m_deg = self.skymodel_df["m"].map(to_deg).values
@@ -137,17 +142,17 @@ class SimVis:
         )[0, :, :2]
 
     def plot_sky_model(self):
-        size = self.img_conf["plane_size"] / 2
-        plt.imshow(self.skymodel, extent=(-size, size, -size, size), cmap='jet')
+        plt.imshow(self.skymodel, extent=(self.l_min, self.l_max, self.m_min, self.m_max), cmap='jet')
         l_rads = self.skymodel_df["l"].values
         m_rads = self.skymodel_df["m"].values
-        l_degs = self.skymodel_df["l"].map(to_deg).values
-        m_degs = self.skymodel_df["m"].map(to_deg).values
-        for i, l_rad in enumerate(l_rads):
-            src = self.skymodel_df[(self.skymodel_df.l == l_rad) & (self.skymodel_df.m == m_rads[i])]
+        for l_rad, m_rad in zip(l_rads, m_rads):
+            src = self.skymodel_df[(self.skymodel_df.l == l_rad) & (self.skymodel_df.m == m_rad)]
             name = src.name.values[0]
             flux = src.flux.values[0]
-            plt.annotate(f"{name}: {flux}", xy=(l_degs[i], m_degs[i]), xytext=(l_degs[i]+1.5, m_degs[i]), fontsize='medium', ha='center', va='center', color='white')
+            l_deg = to_deg(l_rad)
+            m_deg = to_deg(m_rad)
+            plt.annotate(f"{name}: {flux}", xy=(l_deg, m_deg), xytext=(l_deg+1, m_deg), fontsize='medium',
+                         ha='center', va='center', color='white')
         plt.colorbar(label='Brightness')
         plt.xlabel(r'l ($^{\circ}$)')
         plt.ylabel(r'm ($^{\circ}$)')
@@ -194,8 +199,7 @@ class SimVis:
         plt.close()
 
     def plot_psf(self):
-        size = self.img_conf["plane_size"] / 2
-        plt.imshow(log_scale(self.psf), extent=(-size, size, -size, size))
+        plt.imshow(log_scale(self.psf), extent=(self.l_min, self.l_max, self.m_min, self.m_max))
         plt.xlabel(r"l ($^{\circ})$")
         plt.ylabel(r"m ($^{\circ})$")
         plt.title('PSF')
@@ -226,8 +230,7 @@ class SimVis:
         plt.close()
 
     def plot_observed_image(self):
-        size = self.img_conf["plane_size"] / 2
-        plt.imshow(self.obs_img, cmap="jet", extent=(-size, size, -size, size))
+        plt.imshow(self.obs_img, cmap="jet", extent=(self.l_min, self.l_max, self.m_min, self.m_max))
         plt.xlabel(r"l ($^{\circ})$")
         plt.ylabel(r"m ($^{\circ})$")
         plt.title('Observed Image')
@@ -253,20 +256,20 @@ class SimVis:
             v_max = np.ceil(v_range[-1])
 
             plt.figure(figsize=(5, 6))
-            plt.imshow(log_scale(visibilities), extent=(u_min, u_max, v_min, v_max), cmap="jet")
+            plt.imshow(visibilities.real, extent=(u_min, u_max, v_min, v_max), cmap="jet")
             plt.xlabel(r"u (rad$^{-1})$")
             plt.ylabel(r"v (rad$^{-1})$")
-            plt.title(f'Baseline {baseline} Visibilities (Amplitude)')
+            plt.title(f'Baseline {baseline} Visibilities (Real)')
             plt.colorbar(label="Magnitude", orientation='vertical')
             plt.tight_layout()
             plt.savefig(self.results_dir / f"vis_b_{baseline}_amp.png")
             plt.close()
 
             plt.figure(figsize=(5, 6))
-            plt.imshow(np.angle(visibilities), extent=(u_min, u_max, v_min, v_max), cmap='jet')
+            plt.imshow(visibilities.imag, extent=(u_min, u_max, v_min, v_max), cmap='jet')
             plt.xlabel(r"u (rad$^{-1})$")
             plt.ylabel(r"v (rad$^{-1})$")
-            plt.title(f'Baseline {baseline} Visibilities (Phase)')
+            plt.title(f'Baseline {baseline} Visibilities (Imaginary)')
             plt.colorbar(label="Magnitude", orientation='vertical')
             plt.tight_layout()
             plt.savefig(self.results_dir / f"vis_b_{baseline}_phase.png")
