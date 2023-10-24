@@ -141,7 +141,22 @@ class SimVis:
             self.baselines[(self.baselines.name == name) | (self.baselines.conj_name == name)]["UVW"].values
         )[0, :, :2]
 
+    def print_info(self):
+        print("Skymodel:")
+        print(self.skymodel_df.to_string())
+
+        print("\nENU Coordinates:")
+        print(self.enu_coords)
+
+        print("\nBaselines:")
+        print(self.baselines[["name", "A1", "A2"]].to_string())
+        print(self.baselines[["name", "b", "D", "A", "E", "XYZ"]].to_string())
+
+        print("\nUV:")
+        print(self.uv)
+
     def plot_sky_model(self):
+        print("\nPlotting sky model")
         plt.imshow(self.skymodel, extent=(self.l_min, self.l_max, self.m_min, self.m_max), cmap='jet')
         l_rads = self.skymodel_df["l"].values
         m_rads = self.skymodel_df["m"].values
@@ -159,8 +174,10 @@ class SimVis:
         plt.title('Skymodel (in brightness)')
         plt.savefig(self.results_dir / "skymodel.png")
         plt.close()
+        print("Done.")
 
     def plot_antennas_2D(self):
+        print("\nPlotting antennas")
         E = self.enu_coords[:, 0]
         N = self.enu_coords[:, 1]
 
@@ -185,8 +202,10 @@ class SimVis:
 
         plt.savefig(self.results_dir / "antennae.png")
         plt.close()
+        print("Done.")
 
     def plot_uv(self):
+        print("\nPlotting UV tracks")
         mid = len(self.uv) // 2
         plt.figure(figsize=(6, 5))
         plt.scatter(self.uv[:mid, 0], self.uv[:mid, 1], s=2, c="b", label="Baselines")
@@ -197,8 +216,10 @@ class SimVis:
         plt.legend(["Baselines", "Conjugate Baselines"])
         plt.savefig(self.results_dir / "uv-coverage.png")
         plt.close()
+        print("Done.")
 
     def plot_psf(self):
+        print("\nPlotting PSF")
         plt.imshow(log_scale(self.psf), extent=(self.l_min, self.l_max, self.m_min, self.m_max))
         plt.xlabel(r"l ($^{\circ})$")
         plt.ylabel(r"m ($^{\circ})$")
@@ -206,8 +227,10 @@ class SimVis:
         plt.colorbar()
         plt.savefig(self.results_dir / "psf.png")
         plt.close()
+        print("Done.")
 
     def plot_gridded_visibilities(self):
+        print("\nPlotting sampled visibilities")
         u_min = np.floor(self.u_min)
         v_min = np.floor(self.v_min)
         u_max = np.ceil(self.u_max)
@@ -228,8 +251,10 @@ class SimVis:
         plt.colorbar(label="Magnitude", orientation='vertical')
         plt.savefig(self.results_dir / "gridded_phase.png")
         plt.close()
+        print("Done.")
 
     def plot_observed_image(self):
+        print("\nPlotting observed image")
         plt.imshow(self.obs_img, cmap="jet", extent=(self.l_min, self.l_max, self.m_min, self.m_max))
         plt.xlabel(r"l ($^{\circ})$")
         plt.ylabel(r"m ($^{\circ})$")
@@ -237,8 +262,10 @@ class SimVis:
         plt.colorbar()
         plt.savefig(self.results_dir / "image.png")
         plt.close()
+        print("Done.")
 
     def plot_visibilities(self):
+        print("\nPlotting visibilities")
         baselines = self.img_conf["baselines"]
         for baseline in baselines:
             uv = self._get_baseline_uv(baseline)
@@ -274,23 +301,13 @@ class SimVis:
             plt.tight_layout()
             plt.savefig(self.results_dir / f"vis_b_{baseline}_imag.png")
             plt.close()
+        print("Done.")
 
 
 if __name__ == "__main__":
     simvis = SimVis()
 
-    print("Skymodel:")
-    print(simvis.skymodel_df.to_string())
-
-    print("\nENU Coordinates:")
-    print(simvis.enu_coords)
-
-    print("\nBaselines:")
-    print(simvis.baselines[["name", "A1", "A2"]].to_string())
-    print(simvis.baselines[["name", "b",  "D", "A", "E", "XYZ"]].to_string())
-
-    print("\nUV:")
-    print(simvis.uv)
+    simvis.print_info()
 
     simvis.plot_antennas_2D()
     simvis.plot_sky_model()
