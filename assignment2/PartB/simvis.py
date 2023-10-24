@@ -9,7 +9,7 @@ import numpy.linalg as la
 import pandas as pd
 
 from read import read_config, read_enu_coords, read_sky_model_df, read_img_config, input_dir
-from utils import to_deg, scale, log_scale
+from utils import to_deg, scale, log_scale, deg_to_rad, to_rad
 
 
 @dataclass

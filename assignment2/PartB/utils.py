@@ -27,4 +27,4 @@ def scale(x, max_val=255):
 
 def log_scale(x):
     log_abs = np.log(np.abs(x) + 1)
-    return scale(log_abs)
+    return log_abs
