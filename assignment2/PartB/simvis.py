@@ -139,6 +139,15 @@ class SimVis:
     def plot_sky_model(self):
         size = self.img_conf["plane_size"] / 2
         plt.imshow(self.skymodel, extent=(-size, size, -size, size), cmap='jet')
+        l_rads = self.skymodel_df["l"].values
+        m_rads = self.skymodel_df["m"].values
+        l_degs = self.skymodel_df["l"].map(to_deg).values
+        m_degs = self.skymodel_df["m"].map(to_deg).values
+        for i, l_rad in enumerate(l_rads):
+            src = self.skymodel_df[(self.skymodel_df.l == l_rad) & (self.skymodel_df.m == m_rads[i])]
+            name = src.name.values[0]
+            flux = src.flux.values[0]
+            plt.annotate(f"{name}: {flux}", xy=(l_degs[i], m_degs[i]), xytext=(l_degs[i]+1.5, m_degs[i]), fontsize='medium', ha='center', va='center', color='white')
         plt.colorbar(label='Brightness')
         plt.xlabel(r'l ($^{\circ}$)')
         plt.ylabel(r'm ($^{\circ}$)')
