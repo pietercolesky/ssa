@@ -262,7 +262,7 @@ class SimVis:
             plt.title(f'Baseline {baseline} Visibilities (Real)')
             plt.colorbar(label="Magnitude", orientation='vertical')
             plt.tight_layout()
-            plt.savefig(self.results_dir / f"vis_b_{baseline}_amp.png")
+            plt.savefig(self.results_dir / f"vis_b_{baseline}_real.png")
             plt.close()
 
             plt.figure(figsize=(5, 6))
@@ -272,7 +272,7 @@ class SimVis:
             plt.title(f'Baseline {baseline} Visibilities (Imaginary)')
             plt.colorbar(label="Magnitude", orientation='vertical')
             plt.tight_layout()
-            plt.savefig(self.results_dir / f"vis_b_{baseline}_phase.png")
+            plt.savefig(self.results_dir / f"vis_b_{baseline}_imag.png")
             plt.close()
 
 
