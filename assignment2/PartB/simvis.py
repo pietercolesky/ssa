@@ -100,7 +100,7 @@ class SimVis:
         scaled_uv[:, 1] /= (2 * self.v_max / self.Ny)
         scaled_uv[:, 0] += self.Nx / 2
         scaled_uv[:, 1] += self.Ny / 2
-        return scaled_uv.astype(int)
+        return np.round(scaled_uv).astype(int)
 
     def _get_xyz(self, baseline):
         L = self.config["lat"]
