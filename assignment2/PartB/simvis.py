@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from itertools import combinations
+from json import dumps
 from pathlib import Path, PosixPath
 from typing import Dict, Any
 
@@ -144,11 +145,20 @@ class SimVis:
         return np.sum(flux * np.exp(-2 * np.pi * (l * uv[:, :, 0] + m * uv[:, :, 1]) * 1j), axis=1)
 
     def print_info(self):
-        print("Skymodel:")
+        print(f"Configurations: {dumps(self.config, indent=4)}")
+
+        print(f"\nImager configurations: {dumps(self.img_conf, indent=4)}")
+
+        print(f"\nSkymodel:")
         print(self.skymodel_df.to_string())
 
         print("\nENU Coordinates:")
         print(self.enu_coords)
+
+        print(f"\nLM-range: [{self.lm_min}, {self.lm_max}]")
+        print(f"UV-range: [{self.uv_min}, {self.uv_max}]")
+
+        print(f"\nObservational wavelength: {self.obs_wavelength}m")
 
         print("\nBaselines:")
         print(self.baselines[["name", "A1", "A2"]].to_string())
