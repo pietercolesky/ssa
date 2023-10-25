@@ -24,41 +24,39 @@ class SimVis:
         self.results_dir.mkdir(parents=True, exist_ok=True)
 
         self.obs_wavelength = 299792458 / (self.config['obs_freq'] * 10 ** 9)
-        h1, h2 = self.config["hour_angle_range"][0], self.config["hour_angle_range"][1]
+        h1, h2 = self.config["hour_angle_range"]
         self.hour_angle_range = np.linspace(h1, h2, self.config["num_steps"])
 
+        self.flux_min = self.skymodel_df["flux"].min()
+        self.flux_max = self.skymodel_df["flux"].max()
+
+        self.N = self.img_conf["num_pixels"]
         cell_size = self.img_conf["cell_size"]
-        self.Nx = self.Ny = self.img_conf["num_pixels"]
 
-        self.l_min = to_deg(-0.5 * self.Nx * cell_size)
-        self.m_min = to_deg(-0.5 * self.Ny * cell_size)
-        self.l_max = -self.l_min
-        self.m_max = -self.m_min
+        self.lm_max = to_deg(0.5 * self.N * cell_size)
+        self.lm_min = -self.lm_max
 
-        self.u_min = -0.5 * self.Nx * (1 / (self.Nx * cell_size))
-        self.v_min = -0.5 * self.Ny * (1 / (self.Ny * cell_size))
-        self.u_max = -self.u_min
-        self.v_max = -self.v_min
+        self.uv_max = 0.5 * self.N * (1 / (self.N * cell_size))
+        self.uv_min = -self.uv_max
 
         self.skymodel = self._get_skymodel()
         self.baselines = self._get_baselines()
         uv = np.vstack(self.baselines["UVW"].values)[:, :2]
         self.uv = np.concatenate([uv, -uv])
         self.scaled_uv = self._scale_uv()
-        self.gridded_uv = np.zeros((self.Nx, self.Ny), dtype=float)
-        self.gridded_vis = np.zeros((self.Nx, self.Ny), dtype=complex)
+        self.gridded_uv = np.zeros((self.N, self.N), dtype=float)
+        self.gridded_vis = np.zeros((self.N, self.N), dtype=complex)
 
         self._grid()
 
         self.psf = np.fft.fftshift(np.fft.fft2(self.gridded_uv))
 
         obs_img = np.abs(np.fft.fftshift(np.fft.ifft2(self.gridded_vis)))
-        self.obs_img = scale(obs_img, self.skymodel_df["flux"].max())
+        self.obs_img = scale(obs_img, max_val=self.flux_max)
 
     def _get_skymodel(self, sigma=0.1):
-        l_range = np.linspace(self.l_min, self.l_max, self.img_conf["num_pixels"])
-        m_range = np.linspace(self.m_min, self.m_max, self.img_conf["num_pixels"])
-        l, m = np.meshgrid(l_range, m_range[::-1])
+        lm_range = np.linspace(self.lm_min, self.lm_max, self.N)
+        l, m = np.meshgrid(lm_range, lm_range[::-1])
 
         l_deg = self.skymodel_df["l"].map(to_deg).values
         m_deg = self.skymodel_df["m"].map(to_deg).values
@@ -89,10 +87,8 @@ class SimVis:
 
     def _scale_uv(self):
         scaled_uv = np.copy(self.uv)
-        scaled_uv[:, 0] /= (2 * self.u_max / self.Nx)
-        scaled_uv[:, 1] /= (2 * self.v_max / self.Ny)
-        scaled_uv[:, 0] += self.Nx / 2
-        scaled_uv[:, 1] += self.Ny / 2
+        scaled_uv /= (2 * self.uv_max / self.N)
+        scaled_uv += self.N / 2
         return np.round(scaled_uv).astype(int)
 
     def _get_xyz(self, baseline):
@@ -162,7 +158,7 @@ class SimVis:
 
     def plot_sky_model(self):
         print("\nPlotting sky model")
-        plt.imshow(self.skymodel, extent=(self.l_min, self.l_max, self.m_min, self.m_max), cmap='jet')
+        plt.imshow(self.skymodel, extent=(self.lm_min, self.lm_max, self.lm_min, self.lm_max), cmap='jet')
         l_rads = self.skymodel_df["l"].values
         m_rads = self.skymodel_df["m"].values
         for l_rad, m_rad in zip(l_rads, m_rads):
@@ -171,7 +167,7 @@ class SimVis:
             flux = src.flux.values[0]
             l_deg = to_deg(l_rad)
             m_deg = to_deg(m_rad)
-            plt.annotate(f"{name}: {flux}", xy=(l_deg, m_deg), xytext=(l_deg+1, m_deg), fontsize='medium',
+            plt.annotate(f"{name}: {flux}", xy=(l_deg, m_deg), xytext=(l_deg+0.8, m_deg), fontsize='medium',
                          ha='center', va='center', color='white')
         plt.colorbar(label='Brightness')
         plt.xlabel(r'l ($^{\circ}$)')
@@ -225,7 +221,7 @@ class SimVis:
 
     def plot_psf(self):
         print("\nPlotting PSF")
-        plt.imshow(abs_log_scale(self.psf), extent=(self.l_min, self.l_max, self.m_min, self.m_max))
+        plt.imshow(abs_log_scale(self.psf), extent=(self.lm_min, self.lm_max, self.lm_min, self.lm_max))
         plt.xlabel(r"l ($^{\circ})$")
         plt.ylabel(r"m ($^{\circ})$")
         plt.title('PSF')
@@ -236,7 +232,8 @@ class SimVis:
 
     def plot_gridded_vis(self):
         print("\nPlotting gridded visibilities")
-        plt.imshow(abs_log_scale(self.gridded_vis), extent=(self.u_min, self.u_max, self.v_min, self.v_max), cmap="jet")
+        plt.imshow(abs_log_scale(self.gridded_vis), extent=(self.uv_min, self.uv_max, self.uv_min, self.uv_max),
+                   cmap="jet")
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('Gridded Visibilities (Amplitude)')
@@ -244,7 +241,7 @@ class SimVis:
         plt.savefig(self.results_dir / "gridded_amp.png")
         plt.close()
 
-        plt.imshow(np.angle(self.gridded_vis), extent=(self.u_min, self.u_max, self.v_min, self.v_max), cmap="jet")
+        plt.imshow(np.angle(self.gridded_vis), extent=(self.uv_min, self.uv_max, self.uv_min, self.uv_max), cmap="jet")
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('Gridded Visibilities (Phase)')
@@ -255,7 +252,7 @@ class SimVis:
 
     def plot_obs_img(self):
         print("\nPlotting observed image")
-        plt.imshow(self.obs_img, cmap="jet", extent=(self.l_min, self.l_max, self.m_min, self.m_max))
+        plt.imshow(self.obs_img, cmap="jet", extent=(self.lm_min, self.lm_max, self.lm_min, self.lm_max))
         plt.xlabel(r"l ($^{\circ})$")
         plt.ylabel(r"m ($^{\circ})$")
         plt.title('Observed Image')
@@ -266,10 +263,10 @@ class SimVis:
 
     def plot_vis(self):
         print("\nPlotting visibilities")
-        u_min = np.min(self.uv[:, 0])
-        v_min = np.min(self.uv[:, 1])
         u_max = np.max(self.uv[:, 0])
         v_max = np.max(self.uv[:, 1])
+        u_min = -u_max
+        v_min = -v_max
         u_range = np.linspace(u_min, u_max, self.config["num_steps"])
         v_range = np.linspace(v_min, v_max, self.config["num_steps"])
         vis = self._get_vis(u_range, v_range)
