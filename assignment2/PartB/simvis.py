@@ -229,14 +229,9 @@ class SimVis:
         plt.close()
         print("Done.")
 
-    def plot_gridded_visibilities(self):
-        print("\nPlotting sampled visibilities")
-        u_min = np.floor(self.u_min)
-        v_min = np.floor(self.v_min)
-        u_max = np.ceil(self.u_max)
-        v_max = np.ceil(self.v_max)
-
-        plt.imshow(log_scale(self.gridded_vis), extent=(u_min, u_max, v_min, v_max), cmap="jet")
+    def plot_gridded_vis(self):
+        print("\nPlotting gridded visibilities")
+        plt.imshow(log_scale(self.gridded_vis), extent=(self.u_min, self.u_max, self.v_min, self.v_max), cmap="jet")
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('Gridded Visibilities (Amplitude)')
@@ -244,7 +239,7 @@ class SimVis:
         plt.savefig(self.results_dir / "gridded_amp.png")
         plt.close()
 
-        plt.imshow(np.angle(self.gridded_vis), extent=(u_min, u_max, v_min, v_max), cmap="jet")
+        plt.imshow(np.angle(self.gridded_vis), extent=(self.u_min, self.u_max, self.v_min, self.v_max), cmap="jet")
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('Gridded Visibilities (Phase)')
@@ -253,7 +248,7 @@ class SimVis:
         plt.close()
         print("Done.")
 
-    def plot_observed_image(self):
+    def plot_obs_img(self):
         print("\nPlotting observed image")
         plt.imshow(self.obs_img, cmap="jet", extent=(self.l_min, self.l_max, self.m_min, self.m_max))
         plt.xlabel(r"l ($^{\circ})$")
@@ -264,40 +259,62 @@ class SimVis:
         plt.close()
         print("Done.")
 
-    def plot_visibilities(self):
+    def plot_vis(self):
         print("\nPlotting visibilities")
+        u_min = np.min(self.uv[:, 0])
+        v_min = np.min(self.uv[:, 1])
+        u_max = np.max(self.uv[:, 0])
+        v_max = np.max(self.uv[:, 1])
+        u_range = np.linspace(u_min, u_max, self.config["num_steps"])
+        v_range = np.linspace(v_min, v_max, self.config["num_steps"])
+        visibilities = self._get_visibilities(u_range, v_range)
+
+        plt.imshow(visibilities.real, extent=(u_min, u_max, v_min, v_max), cmap="jet")
+        plt.xlabel(r"u (rad$^{-1})$")
+        plt.ylabel(r"v (rad$^{-1})$")
+        plt.title('Real part of Visibilities')
+        plt.colorbar(label="Magnitude")
+        plt.tight_layout()
+        plt.savefig(self.results_dir / "vis_real.png")
+        plt.close()
+
+        plt.imshow(visibilities.imag, extent=(u_min, u_max, v_min, v_max), cmap='jet')
+        plt.xlabel(r"u (rad$^{-1})$")
+        plt.ylabel(r"v (rad$^{-1})$")
+        plt.title('Imaginary part of Visibilities')
+        plt.colorbar(label="Magnitude")
+        plt.tight_layout()
+        plt.savefig(self.results_dir / "vis_imag.png")
+        plt.close()
+        print("Done.")
+
+    def plot_vis_vs_hour_angle(self):
+        print("\nPlotting baseline visibilities vs hour angle")
         baselines = self.img_conf["baselines"]
+        sources = self.skymodel_df[["flux", "l", "m"]].values
+        flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
         for baseline in baselines:
             uv = self._get_baseline_uv(baseline)
             if len(uv) == 0:
                 print(f"Baseline {baseline} not found!")
                 continue
 
-            u_range = np.sort(uv[:, 0])
-            v_range = np.sort(uv[:, 1])
-            visibilities = self._get_visibilities(u_range, v_range)
+            hour_angle_range = to_deg(self.hour_angle_range) / 15
+            uv = uv[:, np.newaxis, :]
+            visibilities = np.sum(flux * np.exp(-2 * np.pi * (l * uv[:, :, 0] + m * uv[:, :, 1]) * 1j), axis=1)
 
-            u_min = np.floor(u_range[0])
-            v_min = np.floor(v_range[0])
-            u_max = np.ceil(u_range[-1])
-            v_max = np.ceil(v_range[-1])
-
-            plt.figure(figsize=(5, 6))
-            plt.imshow(visibilities.real, extent=(u_min, u_max, v_min, v_max), cmap="jet")
-            plt.xlabel(r"u (rad$^{-1})$")
-            plt.ylabel(r"v (rad$^{-1})$")
+            plt.plot(hour_angle_range, visibilities.real)
+            plt.xlabel("Hour Angle (H)")
+            plt.ylabel("Magnitude")
             plt.title(f'Baseline {baseline} Visibilities (Real)')
-            plt.colorbar(label="Magnitude", orientation='vertical')
             plt.tight_layout()
             plt.savefig(self.results_dir / f"vis_b_{baseline}_real.png")
             plt.close()
 
-            plt.figure(figsize=(5, 6))
-            plt.imshow(visibilities.imag, extent=(u_min, u_max, v_min, v_max), cmap='jet')
-            plt.xlabel(r"u (rad$^{-1})$")
-            plt.ylabel(r"v (rad$^{-1})$")
-            plt.title(f'Baseline {baseline} Visibilities (Imaginary)')
-            plt.colorbar(label="Magnitude", orientation='vertical')
+            plt.plot(hour_angle_range, visibilities.imag)
+            plt.xlabel("Hour Angle (H)")
+            plt.ylabel("Magnitude")
+            plt.title(F'Baseline {baseline} Visibilities (Imaginary)')
             plt.tight_layout()
             plt.savefig(self.results_dir / f"vis_b_{baseline}_imag.png")
             plt.close()
@@ -312,7 +329,8 @@ if __name__ == "__main__":
     simvis.plot_antennas_2D()
     simvis.plot_sky_model()
     simvis.plot_uv()
-    simvis.plot_visibilities()
+    simvis.plot_vis()
+    simvis.plot_vis_vs_hour_angle()
     simvis.plot_psf()
-    simvis.plot_gridded_visibilities()
-    simvis.plot_observed_image()
+    simvis.plot_gridded_vis()
+    simvis.plot_obs_img()
