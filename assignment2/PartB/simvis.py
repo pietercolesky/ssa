@@ -123,15 +123,14 @@ class SimVis:
 
     def _grid(self):
         sources = self.skymodel_df[["flux", "l", "m"]].values
+        flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
         for i, uv_point in enumerate(self.scaled_uv):
             u = uv_point[0]
             v = uv_point[1]
-            if 0 <= u < self.Nx and 0 <= v < self.Ny:
-                self.gridded_uv[-v, u] = 1
-                flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
-                self.gridded_vis[-v, u] += np.sum(
-                    flux * np.exp(-2 * np.pi * 1j * (l * self.uv[i][0] + m * self.uv[i][1]))
-                )
+            self.gridded_uv[-v, u] = 1
+            self.gridded_vis[-v, u] += np.sum(
+                flux * np.exp(-2 * np.pi * 1j * (l * self.uv[i][0] + m * self.uv[i][1]))
+            )
 
     def _get_baseline_uv(self, name):
         baselines = np.concatenate([self.baselines.name.values, self.baselines.conj_name.values])
