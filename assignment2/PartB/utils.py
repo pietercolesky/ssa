@@ -25,5 +25,5 @@ def scale(x, max_val=255):
     return (x / np.max(x)) * max_val
 
 
-def log_scale(x):
+def abs_log_scale(x):
     return np.log(np.abs(x) + 1)

@@ -9,7 +9,7 @@ import numpy.linalg as la
 import pandas as pd
 
 from read import read_config, read_enu_coords, read_sky_model_df, read_img_config, input_dir
-from utils import to_deg, scale, log_scale
+from utils import to_deg, scale, abs_log_scale
 
 
 @dataclass
@@ -68,13 +68,6 @@ class SimVis:
         m0 = m_deg[:, np.newaxis, np.newaxis]
         return np.sum(flux * np.exp(-((l - l0) ** 2 + (m - m0) ** 2) / (2 * sigma ** 2)), axis=0)
 
-    def _get_visibilities(self, u_range, v_range):
-        u, v = np.meshgrid(u_range, v_range[::-1])
-        flux = self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis]
-        l0 = self.skymodel_df['l'].values[:, np.newaxis, np.newaxis]
-        m0 = self.skymodel_df['m'].values[:, np.newaxis, np.newaxis]
-        return np.sum(flux * np.exp(-2 * np.pi * (l0 * u + m0 * v) * 1j), axis=0)
-
     def _get_baselines(self):
         baselines = list(combinations(enumerate(self.enu_coords, 1), 2))
         baselines_df = pd.DataFrame(baselines, columns=["A1", "A2"])
@@ -132,13 +125,26 @@ class SimVis:
                 flux * np.exp(-2 * np.pi * 1j * (l * self.uv[i][0] + m * self.uv[i][1]))
             )
 
-    def _get_baseline_uv(self, name):
+    def _get_vis(self, u_range, v_range):
+        u, v = np.meshgrid(u_range, v_range[::-1])
+        flux = self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis]
+        l0 = self.skymodel_df['l'].values[:, np.newaxis, np.newaxis]
+        m0 = self.skymodel_df['m'].values[:, np.newaxis, np.newaxis]
+        return np.sum(flux * np.exp(-2 * np.pi * (l0 * u + m0 * v) * 1j), axis=0)
+
+    def _get_baseline_vis(self, name):
         baselines = np.concatenate([self.baselines.name.values, self.baselines.conj_name.values])
         if name not in baselines:
             return []
-        return np.stack(
+
+        sources = self.skymodel_df[["flux", "l", "m"]].values
+        flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
+
+        uv = np.stack(
             self.baselines[(self.baselines.name == name) | (self.baselines.conj_name == name)]["UVW"].values
-        )[0, :, :2]
+        )[0, :, np.newaxis, :2]
+
+        return np.sum(flux * np.exp(-2 * np.pi * (l * uv[:, :, 0] + m * uv[:, :, 1]) * 1j), axis=1)
 
     def print_info(self):
         print("Skymodel:")
@@ -176,7 +182,7 @@ class SimVis:
         print("Done.")
 
     def plot_antennas_2D(self):
-        print("\nPlotting antennas")
+        print("\nPlotting antennae")
         E = self.enu_coords[:, 0]
         N = self.enu_coords[:, 1]
 
@@ -219,7 +225,7 @@ class SimVis:
 
     def plot_psf(self):
         print("\nPlotting PSF")
-        plt.imshow(log_scale(self.psf), extent=(self.l_min, self.l_max, self.m_min, self.m_max))
+        plt.imshow(abs_log_scale(self.psf), extent=(self.l_min, self.l_max, self.m_min, self.m_max))
         plt.xlabel(r"l ($^{\circ})$")
         plt.ylabel(r"m ($^{\circ})$")
         plt.title('PSF')
@@ -230,7 +236,7 @@ class SimVis:
 
     def plot_gridded_vis(self):
         print("\nPlotting gridded visibilities")
-        plt.imshow(log_scale(self.gridded_vis), extent=(self.u_min, self.u_max, self.v_min, self.v_max), cmap="jet")
+        plt.imshow(abs_log_scale(self.gridded_vis), extent=(self.u_min, self.u_max, self.v_min, self.v_max), cmap="jet")
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('Gridded Visibilities (Amplitude)')
@@ -266,9 +272,9 @@ class SimVis:
         v_max = np.max(self.uv[:, 1])
         u_range = np.linspace(u_min, u_max, self.config["num_steps"])
         v_range = np.linspace(v_min, v_max, self.config["num_steps"])
-        visibilities = self._get_visibilities(u_range, v_range)
+        vis = self._get_vis(u_range, v_range)
 
-        plt.imshow(visibilities.real, extent=(u_min, u_max, v_min, v_max), cmap="jet")
+        plt.imshow(vis.real, extent=(u_min, u_max, v_min, v_max), cmap="jet")
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('Real part of Visibilities')
@@ -277,7 +283,7 @@ class SimVis:
         plt.savefig(self.results_dir / "vis_real.png")
         plt.close()
 
-        plt.imshow(visibilities.imag, extent=(u_min, u_max, v_min, v_max), cmap='jet')
+        plt.imshow(vis.imag, extent=(u_min, u_max, v_min, v_max), cmap='jet')
         plt.xlabel(r"u (rad$^{-1})$")
         plt.ylabel(r"v (rad$^{-1})$")
         plt.title('Imaginary part of Visibilities')
@@ -290,19 +296,16 @@ class SimVis:
     def plot_vis_vs_hour_angle(self):
         print("\nPlotting baseline visibilities vs hour angle")
         baselines = self.img_conf["baselines"]
-        sources = self.skymodel_df[["flux", "l", "m"]].values
-        flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
+
         for baseline in baselines:
-            uv = self._get_baseline_uv(baseline)
-            if len(uv) == 0:
+            vis = self._get_baseline_vis(baseline)
+            if len(vis) == 0:
                 print(f"Baseline {baseline} not found!")
                 continue
 
             hour_angle_range = to_deg(self.hour_angle_range) / 15
-            uv = uv[:, np.newaxis, :]
-            visibilities = np.sum(flux * np.exp(-2 * np.pi * (l * uv[:, :, 0] + m * uv[:, :, 1]) * 1j), axis=1)
 
-            plt.plot(hour_angle_range, visibilities.real)
+            plt.plot(hour_angle_range, vis.real)
             plt.xlabel("Hour Angle (H)")
             plt.ylabel("Magnitude")
             plt.title(f'Baseline {baseline} Visibilities (Real)')
@@ -310,7 +313,7 @@ class SimVis:
             plt.savefig(self.results_dir / f"vis_b_{baseline}_real.png")
             plt.close()
 
-            plt.plot(hour_angle_range, visibilities.imag)
+            plt.plot(hour_angle_range, vis.imag)
             plt.xlabel("Hour Angle (H)")
             plt.ylabel("Magnitude")
             plt.title(F'Baseline {baseline} Visibilities (Imaginary)')
