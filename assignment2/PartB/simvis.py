@@ -178,8 +178,9 @@ class SimVis:
             flux = src.flux.values[0]
             l_deg = to_deg(l_rad)
             m_deg = to_deg(m_rad)
-            plt.annotate(f"{name}: {flux}", xy=(l_deg, m_deg), xytext=(l_deg+0.8, m_deg), fontsize='medium',
-                         ha='center', va='center', color='white')
+            plt.annotate(f"{name}: {flux}", xy=(l_deg, m_deg), xytext=(0.95 * self.lm_max, m_deg),
+                         fontsize='medium', ha='right', va='center', color='white',
+                         arrowprops=dict(facecolor='white', edgecolor='white', arrowstyle='->'))
         plt.colorbar(label='Brightness')
         plt.xlabel(r'l ($^{\circ}$)')
         plt.ylabel(r'm ($^{\circ}$)')
