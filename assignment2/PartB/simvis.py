@@ -115,10 +115,9 @@ class SimVis:
         sources = self.skymodel_df[["flux", "l", "m"]].values
         flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
 
-        u_valid = np.logical_and(0 <= self.scaled_uv[:, 0], self.scaled_uv[:, 0] < self.N)
-        v_valid = np.logical_and(0 <= self.scaled_uv[:, 1], self.scaled_uv[:, 1] < self.N)
-        valid_ind = np.argwhere(np.logical_and(u_valid, v_valid))
-        valid = self.scaled_uv[valid_ind][:, 0]
+        valid = ((0 <= self.scaled_uv[:, 0]) & (self.scaled_uv[:, 0] < self.N) &
+                 (0 <= self.scaled_uv[:, 1]) & (self.scaled_uv[:, 1] < self.N))
+        valid = self.scaled_uv[valid]
 
         for i, uv_point in enumerate(valid):
             u, v = uv_point
