@@ -13,10 +13,6 @@ def hours_to_rad(hours):
     return (np.pi / 12) * hours
 
 
-def total(a, b, c):
-    return a + (b / 60) + (c / 3600)
-
-
 def scale(x, min_val=0, max_val=255):
     x_min = np.min(x)
     x_max = np.max(x)

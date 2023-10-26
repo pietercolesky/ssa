@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 from pandas import read_csv
 
-from utils import hours_to_rad, total, to_rad
+from utils import hours_to_rad, to_rad
 
 input_dir = Path(__file__).parent / 'input'
 
@@ -12,7 +12,7 @@ input_dir = Path(__file__).parent / 'input'
 def _get_total(x):
     is_negative = x.startswith("-")
     a, b, c = map(lambda val: abs(float(val)), x.split(":"))
-    magnitude = total(a, b, c)
+    magnitude = a + (b / 60) + (c / 3600)
     return -magnitude if is_negative else magnitude
 
 
