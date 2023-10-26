@@ -13,7 +13,7 @@ from read import read_config, read_enu_coords, read_sky_model_df, read_img_confi
 from utils import to_deg, scale, abs_log_scale
 
 
-def calculate_vis(flux, l0, m0, u, v, axis):
+def calculate_vis(flux, l0, m0, u, v, axis=None):
     return np.sum(flux * np.exp(-2 * np.pi * (l0 * u + m0 * v) * 1j), axis=axis)
 
 
