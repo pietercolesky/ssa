@@ -35,6 +35,7 @@ def read_enu_coords():
 def read_config():
     with open(input_dir / 'configurations.json', "rb") as file:
         config = load(file)
+    config['obs_freq'] *= 10 ** 9
     config['lat'] = to_rad(_get_total(config['lat']))
     config['ra'] = hours_to_rad(_get_total(config['ra']))
     config['dec'] = to_rad(_get_total(config['dec']))
