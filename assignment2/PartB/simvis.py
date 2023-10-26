@@ -137,14 +137,20 @@ class SimVis:
     def _grid(self):
         N = self.img_conf["N"]
 
-        gridded_uv = np.zeros((N, N), dtype=np.uint8)
+        gridded_uv = np.zeros((N, N), dtype=float)
         gridded_vis = np.zeros((N, N), dtype=complex)
 
         flux, l, m = self._get_sources()
         x, y, u, v = self._filter_valid_uv()
 
-        gridded_uv[y, x] = 1
         np.add.at(gridded_vis, (y, x), calculate_vis(flux, l, m, u, v, 1))
+
+        if self.img_conf["weighting"] == "uniform":
+            np.add.at(gridded_uv, (y, x), 1)
+            gridded_vis[y, x] /= gridded_uv[y, x]
+            gridded_uv[y, x] /= gridded_uv[y, x]
+        else:
+            gridded_uv[y, x] = 1
 
         return gridded_uv, gridded_vis
 
