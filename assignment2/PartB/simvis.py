@@ -115,16 +115,16 @@ class SimVis:
         sources = self.skymodel_df[["flux", "l", "m"]].values
         flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
 
-        valid = ((0 <= self.scaled_uv[:, 0]) & (self.scaled_uv[:, 0] < self.N) &
-                 (0 <= self.scaled_uv[:, 1]) & (self.scaled_uv[:, 1] < self.N))
-        valid = self.scaled_uv[valid]
+        is_valid = ((0 <= self.scaled_uv[:, 0]) & (self.scaled_uv[:, 0] < self.N) &
+                    (0 <= self.scaled_uv[:, 1]) & (self.scaled_uv[:, 1] < self.N))
 
-        for i, uv_point in enumerate(valid):
-            u, v = uv_point
-            self.gridded_uv[-v, u] = 1
-            self.gridded_vis[-v, u] += np.sum(
-                flux * np.exp(-2 * np.pi * 1j * (l * self.uv[i][0] + m * self.uv[i][1]))
-            )
+        ind = self.scaled_uv[is_valid]
+        uv = self.uv[is_valid][:, np.newaxis, :]
+
+        r, c = -ind[:, 1], ind[:, 0]
+
+        self.gridded_uv[r, c] = 1
+        self.gridded_vis[r, c] += np.sum(flux * np.exp(-2 * np.pi * (l * uv[:, :, 0] + m * uv[:, :, 1]) * 1j), axis=1)
 
     def _get_vis(self, u_range, v_range):
         u, v = np.meshgrid(u_range, v_range[::-1])
