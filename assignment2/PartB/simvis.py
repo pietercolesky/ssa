@@ -300,26 +300,27 @@ class SimVis:
         v_max = np.max(self.uv[:, 1])
         u_min = -u_max
         v_min = -v_max
+
         u_range = np.linspace(u_min, u_max, self.config["num_steps"])
         v_range = np.linspace(v_min, v_max, self.config["num_steps"])
+
         vis = self._get_vis(u_range, v_range)
 
-        plt.imshow(vis.real, extent=(u_min, u_max, v_min, v_max), cmap="jet")
-        plt.xlabel(r"u (rad$^{-1})$")
-        plt.ylabel(r"v (rad$^{-1})$")
-        plt.title('Real part of Visibilities')
-        plt.colorbar(label="Magnitude")
-        plt.tight_layout()
-        plt.savefig(self.results_dir / "vis_real.png")
-        plt.close()
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 8))
+        im1 = ax1.imshow(vis.real, extent=(u_min, u_max, v_min, v_max), cmap="jet", aspect="auto")
+        ax1.set_title('Real part of Visibilities')
+        ax1.set_xlabel(r"u (rad$^{-1})$")
+        ax1.set_ylabel(r"v (rad$^{-1})$")
+        fig.colorbar(im1, ax=ax1, label='Magnitude')
 
-        plt.imshow(vis.imag, extent=(u_min, u_max, v_min, v_max), cmap='jet')
-        plt.xlabel(r"u (rad$^{-1})$")
-        plt.ylabel(r"v (rad$^{-1})$")
-        plt.title('Imaginary part of Visibilities')
-        plt.colorbar(label="Magnitude")
+        im2 = ax2.imshow(vis.imag, extent=(u_min, u_max, v_min, v_max), cmap="jet", aspect="auto")
+        ax2.set_title('Imaginary part of Visibilities')
+        ax2.set_xlabel(r"u (rad$^{-1})$")
+        ax2.set_ylabel(r"v (rad$^{-1})$")
+        fig.colorbar(im2, ax=ax2, label='Magnitude')
+
         plt.tight_layout()
-        plt.savefig(self.results_dir / "vis_imag.png")
+        plt.savefig(self.results_dir / "vis.png")
         plt.close()
         print("Done.")
 
