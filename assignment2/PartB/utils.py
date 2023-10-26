@@ -9,12 +9,8 @@ def to_deg(x):
     return x * (180 / np.pi)
 
 
-def deg_to_rad(degrees, arcmin, arcsecs):
-    return to_rad(total(degrees, arcmin, arcsecs))
-
-
-def hours_to_rad(hours, mins, secs):
-    return (np.pi / 12) * total(hours, mins, secs)
+def hours_to_rad(hours):
+    return (np.pi / 12) * hours
 
 
 def total(a, b, c):

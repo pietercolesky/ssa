@@ -4,15 +4,16 @@ from pathlib import Path
 import numpy as np
 from pandas import read_csv
 
-from utils import deg_to_rad, hours_to_rad
+from utils import hours_to_rad, total, to_rad
 
 input_dir = Path(__file__).parent / 'input'
 
 
-def _extract_parts(x):
-    a, b, c = map(float, x.split(":"))
-    is_negative = a < 0
-    return a, -b if is_negative else b, -c if is_negative else c
+def _get_total(x):
+    is_negative = x.startswith("-")
+    a, b, c = map(lambda val: abs(float(val)), x.split(":"))
+    magnitude = total(a, b, c)
+    return -magnitude if is_negative else magnitude
 
 
 def _calculate_l(src):
@@ -34,17 +35,17 @@ def read_enu_coords():
 def read_config():
     with open(input_dir / 'configurations.json', "rb") as file:
         config = load(file)
-    config['lat'] = deg_to_rad(*_extract_parts(config['lat']))
-    config['ra'] = hours_to_rad(*_extract_parts(config['ra']))
-    config['dec'] = deg_to_rad(*_extract_parts(config['dec']))
-    config['hour_angle_range'] = list(map(lambda h: hours_to_rad(*_extract_parts(h)), config['hour_angle_range']))
+    config['lat'] = to_rad(_get_total(config['lat']))
+    config['ra'] = hours_to_rad(_get_total(config['ra']))
+    config['dec'] = to_rad(_get_total(config['dec']))
+    config['hour_angle_range'] = list(map(lambda h: hours_to_rad(_get_total(h)), config['hour_angle_range']))
     return config
 
 
 def read_sky_model_df():
     df = read_csv(input_dir / 'skymodel.csv', usecols=["name", "flux", "ra", "dec"])
-    df["ra"] = df["ra"].map(lambda ra: hours_to_rad(*_extract_parts(ra)))
-    df["dec"] = df["dec"].map(lambda dec: deg_to_rad(*_extract_parts(dec)))
+    df["ra"] = df["ra"].map(lambda ra: hours_to_rad(_get_total(ra)))
+    df["dec"] = df["dec"].map(lambda dec: to_rad(_get_total(dec)))
     field_center = df.iloc[0]
     ra_0 = field_center["ra"]
     dec_0 = field_center["dec"]
@@ -57,6 +58,6 @@ def read_sky_model_df():
 def read_img_config():
     with open(input_dir / 'image.json', "rb") as file:
         config = load(file)
-    config["cell_size"] = deg_to_rad(*_extract_parts(config["cell_size"]))
+    config["cell_size"] = to_rad(_get_total(config["cell_size"]))
     return config
 
