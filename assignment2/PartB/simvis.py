@@ -144,12 +144,12 @@ class SimVis:
         x, y, u, v = self._filter_valid_uv()
 
         gridded_uv[y, x] = 1
-        gridded_vis[y, x] += calculate_vis(flux, l, m, u, v, 1)
+        np.add.at(gridded_vis, (y, x), calculate_vis(flux, l, m, u, v, 1))
 
         return gridded_uv, gridded_vis
 
     def _get_psf(self):
-        return np.fft.fftshift(np.fft.fft2(self.gridded_uv))
+        return np.fft.fftshift(np.fft.ifft2(self.gridded_uv))
 
     def _get_restored_img(self):
         obs_img = np.abs(np.fft.fftshift(np.fft.ifft2(self.gridded_vis)))
@@ -247,7 +247,7 @@ class SimVis:
 
     def plot_psf(self):
         print("\nPlotting PSF")
-        plt.imshow(abs_log_scale(self.psf), extent=(self.lm_min, self.lm_max, self.lm_min, self.lm_max))
+        plt.imshow(np.abs(self.psf), cmap="jet", extent=(self.lm_min, self.lm_max, self.lm_min, self.lm_max))
         plt.xlabel(r"l ($^{\circ})$")
         plt.ylabel(r"m ($^{\circ})$")
         plt.title('PSF')
