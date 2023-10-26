@@ -13,50 +13,53 @@ from read import read_config, read_enu_coords, read_sky_model_df, read_img_confi
 from utils import to_deg, scale, abs_log_scale
 
 
+def calculate_vis(flux, l0, m0, u, v, axis):
+    return np.sum(flux * np.exp(-2 * np.pi * (l0 * u + m0 * v) * 1j), axis=axis)
+
+
 @dataclass
 class SimVis:
     results_dir: PosixPath = Path(__file__).parent / 'results'
     config: Dict[str, Any] = field(default_factory=lambda: read_config())
     img_conf: Dict[str, Any] = field(default_factory=lambda: read_img_config())
-    enu_coords: np.ndarray = field(default_factory=lambda: read_enu_coords())
+    enu_coords: np.ndarray[float] = field(default_factory=lambda: read_enu_coords())
     skymodel_df: pd.DataFrame = field(default_factory=lambda: read_sky_model_df())
 
     def __post_init__(self):
-        self.results_dir.mkdir(parents=True, exist_ok=True)
+        self._create_results_directory()
 
-        self.obs_wavelength = 299792458 / self.config['obs_freq']
-        h1, h2 = self.config["hour_angle_range"]
-        self.hour_angle_range = np.linspace(h1, h2, self.config["num_steps"])
-
-        self.flux_min = self.skymodel_df["flux"].min()
-        self.flux_max = self.skymodel_df["flux"].max()
-
-        self.N = self.img_conf["num_pixels"]
-        cell_size = self.img_conf["cell_size"]
-
-        self.lm_max = to_deg(0.5 * self.N * cell_size)
-        self.lm_min = -self.lm_max
-
-        self.uv_max = 0.5 * self.N * (1 / (self.N * cell_size))
-        self.uv_min = -self.uv_max
+        self.obs_wavelength = self._calculate_wavelength()
+        self.hour_angle_range = self._get_hour_angle_range()
+        self.lm_min, self.lm_max, self.uv_min, self.uv_max = self._get_min_max()
 
         self.skymodel = self._get_skymodel()
         self.baselines = self._get_baselines()
-        uv = np.vstack(self.baselines["UVW"].values)[:, :2]
-        self.uv = np.concatenate([uv, -uv])
+        self.uv = self._get_uv()
         self.scaled_uv = self._scale_uv()
-        self.gridded_uv = np.zeros((self.N, self.N), dtype=float)
-        self.gridded_vis = np.zeros((self.N, self.N), dtype=complex)
+        self.gridded_uv, self.gridded_vis = self._grid()
+        self.psf = self._get_psf()
+        self.obs_img = self._get_restored_img()
 
-        self._grid()
+    def _create_results_directory(self):
+        self.results_dir.mkdir(parents=True, exist_ok=True)
 
-        self.psf = np.fft.fftshift(np.fft.fft2(self.gridded_uv))
+    def _calculate_wavelength(self):
+        return 299792458 / self.config['obs_freq']
 
-        obs_img = np.abs(np.fft.fftshift(np.fft.ifft2(self.gridded_vis)))
-        self.obs_img = scale(obs_img, max_val=self.flux_max)
+    def _get_hour_angle_range(self):
+        return np.linspace(*self.config["hour_angle_range"], self.config["num_steps"])
+
+    def _get_min_max(self):
+        N = self.img_conf["N"]
+        cell_size = self.img_conf["cell_size"]
+        lm_max = to_deg(0.5 * N * cell_size)
+        uv_max = 0.5 * N * (1 / (N * cell_size))
+        return -lm_max, lm_max, -uv_max, uv_max
 
     def _get_skymodel(self, sigma=0.1):
-        lm_range = np.linspace(self.lm_min, self.lm_max, self.N)
+        N = self.img_conf["N"]
+
+        lm_range = np.linspace(self.lm_min, self.lm_max, N)
         l, m = np.meshgrid(lm_range, lm_range[::-1])
 
         l_deg = self.skymodel_df["l"].map(to_deg).values
@@ -66,31 +69,6 @@ class SimVis:
         l0 = l_deg[:, np.newaxis, np.newaxis]
         m0 = m_deg[:, np.newaxis, np.newaxis]
         return np.sum(flux * np.exp(-((l - l0) ** 2 + (m - m0) ** 2) / (2 * sigma ** 2)), axis=0)
-
-    def _get_baselines(self):
-        baselines = list(combinations(enumerate(self.enu_coords, 1), 2))
-        baselines_df = pd.DataFrame(baselines, columns=["A1", "A2"])
-        baselines_df["name"] = baselines_df.apply(lambda row: f'{row["A1"][0]}_{row["A2"][0]}', axis=1)
-        baselines_df["conj_name"] = baselines_df.name.map(lambda name: '_'.join(reversed(name.split('_'))))
-        baselines_df["A1"] = baselines_df["A1"].apply(lambda x: x[1])
-        baselines_df["A2"] = baselines_df["A2"].apply(lambda x: x[1])
-        baselines_df["b"] = baselines_df["A2"] - baselines_df["A1"]
-        baselines_df["D"] = baselines_df["b"].map(la.norm)
-        baselines_df["A"] = baselines_df["b"].map(lambda b: np.arctan(b[0] / b[1]))
-        baselines_df["E"] = baselines_df["b"].map(lambda b: np.arctan(b[2] / la.norm(b[:2])))
-        baselines_df["XYZ"] = baselines_df[["D", "A", "E"]].apply(
-            lambda baseline: self._get_xyz(baseline), axis=1
-        )
-        baselines_df["UVW"] = baselines_df["XYZ"].map(
-            lambda xyz: self._get_uvw(xyz)
-        )
-        return baselines_df
-
-    def _scale_uv(self):
-        scaled_uv = np.copy(self.uv)
-        scaled_uv /= (2 * self.uv_max / self.N)
-        scaled_uv += self.N / 2
-        return np.round(scaled_uv).astype(int)
 
     def _get_xyz(self, baseline):
         L = self.config["lat"]
@@ -111,41 +89,71 @@ class SimVis:
             ]).dot(xyz) / self.obs_wavelength, self.hour_angle_range
         ))
 
-    def _grid(self):
-        sources = self.skymodel_df[["flux", "l", "m"]].values
-        flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
+    def _get_baselines(self):
+        baselines = list(combinations(enumerate(self.enu_coords, 1), 2))
+        baselines_df = pd.DataFrame(baselines, columns=["A1", "A2"])
+        baselines_df["name"] = baselines_df.apply(lambda row: f'{row["A1"][0]}_{row["A2"][0]}', axis=1)
+        baselines_df["conj_name"] = baselines_df.name.map(lambda name: '_'.join(reversed(name.split('_'))))
+        baselines_df["A1"] = baselines_df["A1"].apply(lambda x: x[1])
+        baselines_df["A2"] = baselines_df["A2"].apply(lambda x: x[1])
+        baselines_df["b"] = baselines_df["A2"] - baselines_df["A1"]
+        baselines_df["D"] = baselines_df["b"].map(la.norm)
+        baselines_df["A"] = baselines_df["b"].map(lambda b: np.arctan(b[0] / b[1]))
+        baselines_df["E"] = baselines_df["b"].map(lambda b: np.arctan(b[2] / la.norm(b[:2])))
+        baselines_df["XYZ"] = baselines_df[["D", "A", "E"]].apply(
+            lambda baseline: self._get_xyz(baseline), axis=1
+        )
+        baselines_df["UVW"] = baselines_df["XYZ"].map(
+            lambda xyz: self._get_uvw(xyz)
+        )
+        return baselines_df
 
-        is_valid = ((0 <= self.scaled_uv[:, 0]) & (self.scaled_uv[:, 0] < self.N) &
-                    (0 <= self.scaled_uv[:, 1]) & (self.scaled_uv[:, 1] < self.N))
+    def _get_uv(self):
+        uv = np.vstack(self.baselines["UVW"].values)[:, :2]
+        return np.concatenate([uv, -uv])
+
+    def _scale_uv(self):
+        N = self.img_conf["N"]
+        scaled_uv = np.copy(self.uv)
+        scaled_uv /= (2 * self.uv_max / N)
+        scaled_uv += N / 2
+        return np.round(scaled_uv).astype(int)
+
+    def _get_sources(self):
+        sources = self.skymodel_df[["flux", "l", "m"]].values
+        return sources[:, 0], sources[:, 1], sources[:, 2]
+
+    def _filter_valid_uv(self):
+        N = self.img_conf["N"]
+
+        is_valid = ((0 <= self.scaled_uv[:, 0]) & (self.scaled_uv[:, 0] < N) &
+                    (0 <= self.scaled_uv[:, 1]) & (self.scaled_uv[:, 1] < N))
 
         ind = self.scaled_uv[is_valid]
         uv = self.uv[is_valid][:, np.newaxis, :]
 
-        r, c = -ind[:, 1], ind[:, 0]
+        return ind[:, 0], -ind[:, 1], uv[:, :, 0], uv[:, :, 1]
 
-        self.gridded_uv[r, c] = 1
-        self.gridded_vis[r, c] += np.sum(flux * np.exp(-2 * np.pi * (l * uv[:, :, 0] + m * uv[:, :, 1]) * 1j), axis=1)
+    def _grid(self):
+        N = self.img_conf["N"]
 
-    def _get_vis(self, u_range, v_range):
-        u, v = np.meshgrid(u_range, v_range[::-1])
-        flux = self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis]
-        l0 = self.skymodel_df['l'].values[:, np.newaxis, np.newaxis]
-        m0 = self.skymodel_df['m'].values[:, np.newaxis, np.newaxis]
-        return np.sum(flux * np.exp(-2 * np.pi * (l0 * u + m0 * v) * 1j), axis=0)
+        gridded_uv = np.zeros((N, N), dtype=np.uint8)
+        gridded_vis = np.zeros((N, N), dtype=complex)
 
-    def _get_baseline_vis(self, name):
-        baselines = np.concatenate([self.baselines.name.values, self.baselines.conj_name.values])
-        if name not in baselines:
-            return []
+        flux, l, m = self._get_sources()
+        x, y, u, v = self._filter_valid_uv()
 
-        sources = self.skymodel_df[["flux", "l", "m"]].values
-        flux, l, m = sources[:, 0], sources[:, 1], sources[:, 2]
+        gridded_uv[y, x] = 1
+        gridded_vis[y, x] += calculate_vis(flux, l, m, u, v, 1)
 
-        uv = np.stack(
-            self.baselines[(self.baselines.name == name) | (self.baselines.conj_name == name)]["UVW"].values
-        )[0, :, np.newaxis, :2]
+        return gridded_uv, gridded_vis
 
-        return np.sum(flux * np.exp(-2 * np.pi * (l * uv[:, :, 0] + m * uv[:, :, 1]) * 1j), axis=1)
+    def _get_psf(self):
+        return np.fft.fftshift(np.fft.fft2(self.gridded_uv))
+
+    def _get_restored_img(self):
+        obs_img = np.abs(np.fft.fftshift(np.fft.ifft2(self.gridded_vis)))
+        return scale(obs_img, max_val=self.skymodel_df["flux"].max())
 
     def print_info(self):
         print(f"Configurations: {dumps(self.config, indent=4)}")
@@ -207,8 +215,11 @@ class SimVis:
         ax = fig.add_subplot(111)
 
         for i in range(len(E)):
-            ax.imshow(marker, extent=[E[i] - marker_size / 2, E[i] + marker_size / 2, N[i] - marker_size / 2,
-                                      N[i] + marker_size / 2])
+            e_min = float(E[i] - marker_size / 2)
+            e_max = float(E[i] + marker_size / 2)
+            n_min = float(N[i] - marker_size / 2)
+            n_max = float(N[i] + marker_size / 2)
+            ax.imshow(marker, extent=(e_min, e_max, n_min, n_max))
 
         ax.set_xlabel("W-E (m)")
         ax.set_ylabel("S-N (m)")
@@ -276,6 +287,13 @@ class SimVis:
         plt.close()
         print("Done.")
 
+    def _get_vis(self, u_range, v_range):
+        u, v = np.meshgrid(u_range, v_range[::-1])
+        flux = self.skymodel_df['flux'].values[:, np.newaxis, np.newaxis]
+        l0 = self.skymodel_df['l'].values[:, np.newaxis, np.newaxis]
+        m0 = self.skymodel_df['m'].values[:, np.newaxis, np.newaxis]
+        return calculate_vis(flux, l0, m0, u, v, 0)
+
     def plot_vis(self):
         print("\nPlotting visibilities")
         u_max = np.max(self.uv[:, 0])
@@ -304,6 +322,19 @@ class SimVis:
         plt.savefig(self.results_dir / "vis_imag.png")
         plt.close()
         print("Done.")
+
+    def _get_baseline_vis(self, name):
+        baselines = np.concatenate([self.baselines.name.values, self.baselines.conj_name.values])
+        if name not in baselines:
+            return []
+
+        flux, l, m = self._get_sources()
+
+        uv = np.stack(
+            self.baselines[(self.baselines.name == name) | (self.baselines.conj_name == name)]["UVW"].values
+        )[0, :, np.newaxis, :2]
+
+        return calculate_vis(flux, l, m, uv[:, :, 0], uv[:, :, 1], 1)
 
     def plot_vis_vs_hour_angle(self):
         print("\nPlotting baseline visibilities vs hour angle")
