@@ -37,7 +37,6 @@ def read_config():
         config = load(file)
     config['obs_freq'] *= 10 ** 9
     config['lat'] = to_rad(_get_total(config['lat']))
-    config['ra'] = hours_to_rad(_get_total(config['ra']))
     config['dec'] = to_rad(_get_total(config['dec']))
     config['hour_angle_range'] = list(map(lambda h: hours_to_rad(_get_total(h)), config['hour_angle_range']))
     return config
